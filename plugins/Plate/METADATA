@@ -1,0 +1,14 @@
+Metadata-version: 1.1
+Plugin-name: Plate
+Command: /wp
+Buffer-permissions: False:False
+Version: 1.0.0
+Summary: 115网盘
+Home-page: https://github.com/plutobell/teelebot
+Author: Pluto (github.com/plutobell)
+Author-email: hi#ojoll.com (#==@)
+License: GPLv3
+Keywords: Plate
+Requires-teelebot: >=2.3.0
+Requires-dist: 
+Source: https://github.com/plutobell/teelebot-plugins
