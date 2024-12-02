@@ -165,6 +165,12 @@ def Plate(bot, message):
             bot.message_deletor(gap, chat_id, message_id)
             return False
 
+    if str(user_id) not in admins:
+        msg = "权限不足，请授予全部权限以使用 Admin 插件。"
+        status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode="HTML")
+        bot.message_deletor(30, chat_id, status["message_id"])
+        return
+
     count = 0
     for c in command.keys():
         if c in str(text):
@@ -205,7 +211,20 @@ def Plate(bot, message):
         )
         bot.message_deletor(10, chat_id, status["message_id"])
         return
-
+    elif text == prefix + command["/wplogout"]:
+        client.logout()
+        status = sendLoginActions(
+            bot,
+            message,
+            photo,
+            [
+                [
+                    {"text": "115扫码登录", "callback_data": f"{prefix}-login"},
+                ],
+            ],
+        )
+        bot.message_deletor(8, chat_id, status["message_id"])
+        return
     # 命令插件功能
     elif message_type == "callback_query_data":
         reply_to_message = message.get("reply_to_message")
@@ -236,11 +255,7 @@ def Plate(bot, message):
         #  初次发送引用内容
         reply_to_message = message["reply_to_message"]
         target_chat_id = reply_to_message["chat"]["id"]
-        if (
-            str(user_id) in admins
-            and str(chat_id) == str(target_chat_id)
-            and command.get(text)
-        ):
+        if str(chat_id) == str(target_chat_id) and command.get(text):
             client.fs.chdir(0)
             handle_sendMessage(bot, message, client, [text, "cd", 0], False)
         return
