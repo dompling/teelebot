@@ -13,11 +13,13 @@ import json, math, re
 
 cookie_path = "Plate/115-cookie.txt"
 available_app = "115android"
+
 command = {  # 命令注册
     "/wpshare": "share",
     # "/wpupload": "upload",
     # "/wpdonwload": "download",
     "/wpoff": "off",
+    "/wplogout": "logout",
 }
 
 command_text = {  # 命令注册
@@ -25,6 +27,7 @@ command_text = {  # 命令注册
     # "/wpupload": "上传到",
     # "/wpdonwload": "下载",
     "/wpoff": "离线任务保存到",
+    "/wplogut": "登出当前账号",
 }
 
 # 每页显示的项目数量
@@ -117,10 +120,15 @@ def get_page_btn(commands, client: P115Client, current, cid):
 
 
 def Plate(bot, message):
+    gap = 15
+    message_id = message["message_id"]
     text = message.get("text", "")
     chat_id = message["chat"]["id"]
     message_type = message["message_type"]
     chat_type = message["chat"]["type"]
+    bot_id = bot.bot_id
+    root_id = bot.root_id
+    user_id = message["from"]["id"]
 
     callback_query_data = message.get("callback_query_data", None)
 
@@ -136,6 +144,26 @@ def Plate(bot, message):
 
     if message_type not in ["text", "callback_query_data"] or chat_type == "channel":
         return
+
+    if message["chat"]["type"] != "private":
+        admins = administrators(bot=bot, chat_id=chat_id)
+        admins.append(bot_id)
+        if str(root_id) not in admins:
+            admins.append(str(root_id))  # root permission
+
+    if message["chat"]["type"] != "private":
+        results = bot.getChatAdministrators(chat_id=chat_id)  # 判断Bot是否具管理员权限
+        admin_status = False
+        for admin_user in results:
+            if str(admin_user["user"]["id"]) == str(bot_id):
+                admin_status = True
+        if admin_status != True:
+            status = bot.sendChatAction(chat_id=chat_id, action="typing")
+            msg = "权限不足，请授予全部权限以使用 Admin 插件。"
+            status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode="HTML")
+            bot.message_deletor(30, chat_id, status["message_id"])
+            bot.message_deletor(gap, chat_id, message_id)
+            return False
 
     count = 0
     for c in command.keys():
@@ -166,6 +194,7 @@ def Plate(bot, message):
             "<b>115网盘 插件功能</b>\n\n"
             + "<b>/wpshare</b> - 引用分享链接保存到网盘\n"
             + "<b>/wpoff</b> - 引用磁力链保存到网盘\n"
+            + "<b>/wplogout</b> - 引用磁力链保存到网盘\n"
             + "\n"
         )
         status = bot.sendMessage(
@@ -207,7 +236,11 @@ def Plate(bot, message):
         #  初次发送引用内容
         reply_to_message = message["reply_to_message"]
         target_chat_id = reply_to_message["chat"]["id"]
-        if str(chat_id) == str(target_chat_id) and command.get(text):
+        if (
+            str(user_id) in admins
+            and str(chat_id) == str(target_chat_id)
+            and command.get(text)
+        ):
             client.fs.chdir(0)
             handle_sendMessage(bot, message, client, [text, "cd", 0], False)
         return
@@ -421,3 +454,16 @@ def sendLoginActions(bot, message, photo, inlineKeyboard):
     )
 
     return status
+
+
+def administrators(bot, chat_id):
+    admins = []
+    results = bot.getChatAdministrators(chat_id=chat_id)
+    if results != False:
+        for result in results:
+            if str(result["user"]["is_bot"]) == "False":
+                admins.append(str(result["user"]["id"]))
+    else:
+        admins = False
+
+    return admins
