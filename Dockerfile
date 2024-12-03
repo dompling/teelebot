@@ -4,7 +4,7 @@ LABEL maintainer="github.com/plutobell"
 LABEL description="teelebot is a robot framework based on Telegram Bot API, with plug-in system, easy to extend."
 LABEL source="https://github.com/plutobell/teelebot"
 
-RUN apk add --no-cache --virtual .build-deps tzdata gcc\
+RUN apk add --no-cache --virtual .build-deps tzdata gcc musl-dev linux-headers\
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && apk del .build-deps \
