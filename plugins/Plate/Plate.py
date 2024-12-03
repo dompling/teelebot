@@ -66,7 +66,7 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
     return menu
 
 
-def generate_pagination_keyboard(commands, directories, current_page, total_pages, cid):
+def generate_pagination_keyboard(commands, directories, current_page, total_pages, cid=0):
     # 计算当前页面的开始和结束索引
     start = current_page * ITEMS_PER_PAGE
     end = min((current_page + 1) * ITEMS_PER_PAGE, len(directories))
@@ -83,14 +83,14 @@ def generate_pagination_keyboard(commands, directories, current_page, total_page
         footer_buttons.append(
             {
                 "text": "上一页",
-                "callback_data": f"{commands} page?page={current_page-1}",
+                "callback_data": f"{commands} page={current_page-1} {cid}",
             }
         )
     if current_page < total_pages - 1:
         footer_buttons.append(
             {
                 "text": "下一页",
-                "callback_data": f"{commands} page?page={current_page+1}",
+                "callback_data": f"{commands} page={current_page+1} {cid}",
             }
         )
 
@@ -100,8 +100,8 @@ def generate_pagination_keyboard(commands, directories, current_page, total_page
             "callback_data": f"{commands} {cid}",
         }
     ]
-
-    if cid != 0:
+    
+    if int(cid) != 0:
         header_buttons.insert(
             0, {"text": "上级目录", "callback_data": f"{commands} .."}
         )
@@ -243,8 +243,8 @@ def Plate(bot, message):
             call = callback_query_data.split(" ")
             if "login" in callback_query_data:
                 handle_login(bot, message, client)
-            elif "page?page=" in callback_query_data:
-                page = int(callback_query_data.split("=")[1])
+            elif "page" in callback_query_data:
+                page = int(call[1].split("=")[1])
                 handle_sendMessage(bot, message, client, call, True, page)
             elif prefix + command[call[0]] == call[0]:
                 handle_files_command(bot, message, client, call)
