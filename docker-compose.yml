@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  teelebot:
+    image: ghcr.io/plutobell/teelebot:latest
+    container_name: teelebot
+    restart: always
+    volumes:
+      - $PWD/teelebot/config:/config
+      - $PWD/teelebot/plugins:/plugins
+    tty: true
+    stdin_open: true
