@@ -66,7 +66,9 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
     return menu
 
 
-def generate_pagination_keyboard(commands, directories, current_page, total_pages, cid=0):
+def generate_pagination_keyboard(
+    commands, directories, current_page, total_pages, cid=0
+):
     # 计算当前页面的开始和结束索引
     start = current_page * ITEMS_PER_PAGE
     end = min((current_page + 1) * ITEMS_PER_PAGE, len(directories))
@@ -100,10 +102,10 @@ def generate_pagination_keyboard(commands, directories, current_page, total_page
             "callback_data": f"{commands} {cid}",
         }
     ]
-    
+
     if int(cid) != 0:
         header_buttons.insert(
-            0, {"text": "上级目录", "callback_data": f"{commands} .."}
+            0, {"text": "上级目录", "callback_data": f"{commands} .. {cid}"}
         )
 
     return build_menu(
@@ -301,12 +303,12 @@ def handle_sendMessage(
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     header = "<b>当前目录：" + current_path + "</b>"
     msg = []
+
     if is_edit == False:
         msg.append(header)
-        content = reply_to_message.get("text", reply_to_message.get("caption", ""))
-        reuslt = macth_content(content)
-        msg.append(reuslt)
         botAction = bot.sendMessage
+        bot.message_deletor(3, message["chat"]["id"], message_id)
+        message_id = reply_to_message.get("message_id")
     else:
         msg = message.get("text").split("\n")
         msg[0] = header
@@ -330,13 +332,12 @@ def handle_sendMessage(
 
 # 处理目录操作
 def handle_files_command(bot, message, client: P115Client, actions=[]):
-    text = message.get("text", "")
     if actions[1] == "cd":
         client.fs.chdir(int(actions[2]))
         handle_sendMessage(bot, message, client, actions)
     elif actions[1] == "..":
-        texts = text.split("\n")
-        current_path = texts[0].split("：")[1].split("/")
+        current_path = client.fs.get_path(actions[2])
+        current_path = current_path.split("/")
         pre_path = "/".join(current_path[0:-1])
         client.fs.chdir(pre_path)
         cid = client.fs.getcid()
@@ -351,9 +352,11 @@ def handle_command(bot, message, client: P115Client, actions):
     actions 固定为 [命令,cid]
     """
     message_id = message["message_id"]
-    text = message.get("text", "")
-    texts = text.split("\n")
-    url = texts[1]
+    reply_to_message = message["reply_to_message"]
+
+    content = reply_to_message.get("text", reply_to_message.get("caption", ""))
+    url = macth_content(content)
+    
     bot.message_deletor(2, message["chat"]["id"], message_id)
     if command[actions[0]] == command["/wpshare"]:
         handle_save_share_url(bot, message, client, url, actions[1])
