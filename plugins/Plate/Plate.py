@@ -16,7 +16,7 @@ available_app = "115android"
 
 command = {  # 命令注册
     "/wpshare": "share",
-    # "/wpupload": "upload",
+    "/wpupload": "upload",
     # "/wpdonwload": "download",
     "/wpoff": "off",
     "/wplogout": "logout",
@@ -24,8 +24,7 @@ command = {  # 命令注册
 
 command_text = {  # 命令注册
     "/wpshare": "网盘链接保存到",
-    # "/wpupload": "上传到",
-    # "/wpdonwload": "下载",
+    "/wpupload": "上传到",
     "/wpoff": "离线任务保存到",
     "/wplogut": "登出当前账号",
 }
@@ -74,7 +73,7 @@ def generate_pagination_keyboard(commands, directories, current_page, total_page
 
     # 创建当前页面的按钮
     buttons = [
-        {"text": d["name"], "callback_data": f"{commands} cd {d['id']}"}
+        {"text": "📂" + d["name"], "callback_data": f"{commands} cd {d['id']}"}
         for i, d in enumerate(directories[start:end], start=start)
     ]
 
@@ -82,11 +81,17 @@ def generate_pagination_keyboard(commands, directories, current_page, total_page
     # 创建分页按钮
     if current_page > 0:
         footer_buttons.append(
-            {"text": "<<", "callback_data": f"{commands} page?page={current_page-1}"}
+            {
+                "text": "上一页",
+                "callback_data": f"{commands} page?page={current_page-1}",
+            }
         )
     if current_page < total_pages - 1:
         footer_buttons.append(
-            {"text": ">>", "callback_data": f"{commands} page?page={current_page+1}"}
+            {
+                "text": "下一页",
+                "callback_data": f"{commands} page?page={current_page+1}",
+            }
         )
 
     header_buttons = [
@@ -151,7 +156,6 @@ def Plate(bot, message):
         if str(root_id) not in admins:
             admins.append(str(root_id))  # root permission
 
-    if message["chat"]["type"] != "private":
         results = bot.getChatAdministrators(chat_id=chat_id)  # 判断Bot是否具管理员权限
         admin_status = False
         for admin_user in results:
@@ -165,11 +169,11 @@ def Plate(bot, message):
             bot.message_deletor(gap, chat_id, message_id)
             return False
 
-    if str(user_id) not in admins:
-        msg = "权限不足，请授予全部权限以使用 Admin 插件。"
-        status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode="HTML")
-        bot.message_deletor(30, chat_id, status["message_id"])
-        return
+        if str(user_id) not in admins:
+            msg = "权限不足，请授予全部权限以使用 Admin 插件。"
+            status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode="HTML")
+            bot.message_deletor(30, chat_id, status["message_id"])
+            return
 
     count = 0
     for c in command.keys():
@@ -200,7 +204,7 @@ def Plate(bot, message):
             "<b>115网盘 插件功能</b>\n\n"
             + "<b>/wpshare</b> - 引用分享链接保存到网盘\n"
             + "<b>/wpoff</b> - 引用磁力链保存到网盘\n"
-            + "<b>/wplogout</b> - 引用磁力链保存到网盘\n"
+            + "<b>/wplogout</b> - 退出重新登录\n"
             + "\n"
         )
         status = bot.sendMessage(
@@ -261,17 +265,34 @@ def Plate(bot, message):
         return
 
 
-"""
-消息固定为: 
-    当前目录：/ \n 引用内容xxx
-    引用内容为操作的 115 链接，视频文件，磁力链等
-"""
+# 解析链接
+def macth_content(content):
+    link = re.search(r"(https://115\.com/s/.*?password=.*?)\n", content)
+    print(link)
+    if link:
+        return link.group(1)
+
+    magnet_link = re.search(r"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}.*?)\n", content)
+    if magnet_link:
+        return magnet_link.group(1)
+
+    ed2k_link = re.search(r"(ed2k://\|file\|.*?\|/\n)", content)
+    if ed2k_link:
+        return ed2k_link.group(1)
+
+    return content
 
 
 # 解析方式
 def handle_sendMessage(
     bot, message, client: P115Client, actions=[], is_edit=True, page=0
 ):
+    """
+    消息固定为:
+        当前目录：/ \n 引用内容xxx
+        引用内容为操作的 115 链接，视频文件，磁力链等
+    """
+
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
     reply_to_message = message["reply_to_message"]
@@ -282,7 +303,9 @@ def handle_sendMessage(
     msg = []
     if is_edit == False:
         msg.append(header)
-        msg.append(reply_to_message["text"])
+        content = reply_to_message.get("text", reply_to_message.get("caption", ""))
+        reuslt = macth_content(content)
+        msg.append(reuslt)
         botAction = bot.sendMessage
     else:
         msg = message.get("text").split("\n")
@@ -322,13 +345,11 @@ def handle_files_command(bot, message, client: P115Client, actions=[]):
         handle_command(bot, message, client, actions)
 
 
-"""
-处理 command 列表中的命令
-actions 固定为 [命令,cid]
-"""
-
-
 def handle_command(bot, message, client: P115Client, actions):
+    """
+    处理 command 列表中的命令
+    actions 固定为 [命令,cid]
+    """
     message_id = message["message_id"]
     text = message.get("text", "")
     texts = text.split("\n")
@@ -344,8 +365,8 @@ def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
-    print(response)
-    text = f"{url}离线任务保存成功"
+    path = client.fs.get_path(save_path)
+    text = "离线任务保存成功\n" + "<b>文件目录：" + path + "</b>"
     if response.get("error_msg"):
         text = response["error_msg"]
     status = bot.sendMessage(
@@ -378,7 +399,8 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
             [item.get("fid", item.get("cid")) for item in list_data]
         )
         response = client.share_receive(share_params)
-        text = url + "分享保存成功"
+        path = client.fs.get_path(save_path)
+        text = "分享保存成功\n" + "<b>" + path + "</b>"
         if response["error"]:
             text = response["error"]
         status = bot.sendMessage(
