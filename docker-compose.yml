@@ -5,7 +5,7 @@ services:
     container_name: teelebot
     restart: always
     volumes:
-      - $PWD/teelebot/config:/config
-      - $PWD/teelebot/plugins:/plugins
+      - $PWD/config:/config
+      - $PWD/plugins:/plugins
     tty: true
     stdin_open: true
