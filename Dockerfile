@@ -9,7 +9,13 @@ RUN apk add --no-cache --virtual .build-deps tzdata \
     && echo "Asia/Shanghai" > /etc/timezone \
     && apk del .build-deps \
     && pip3 install --no-cache-dir teelebot \
-    && mkdir /config && mkdir /plugins \
-    && history -c
+    && mkdir /config && mkdir /plugins
+
+RUN apk add gcc musl-dev linux-headers liblz4-dev lz4-dev\
+    && pip install lz4\
+    && pip3 install -U python-115 
+
+RUN history -c
+
 
 ENTRYPOINT ["teelebot", "-c", "/config/config.cfg", "-p", "/plugins"]
