@@ -30,6 +30,8 @@ command_text = {  # 命令注册
 # 每页显示的项目数量
 ITEMS_PER_PAGE = 5
 
+logo = "https://raw.githubusercontent.com/dompling/teelebot/refs/heads/plugin/plugins/Plate/icon.jpg"
+
 
 def get_cookie(path):
     cookies = ""
@@ -270,10 +272,6 @@ def handle_sendMessage(
         当前目录：/ \n 引用内容xxx
         引用内容为操作的 115 链接，视频文件，磁力链等
     """
-    plugin_dir = bot.plugin_dir
-
-    with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
-        photo = p.read()
 
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
@@ -287,7 +285,7 @@ def handle_sendMessage(
         status = bot.sendPhoto(
             chat_id=chat_id,
             caption=msg,
-            photo=photo,
+            photo=logo,
             parse_mode="HTML",
             reply_to_message_id=message_id,
             reply_markup=get_page_btn(
@@ -518,15 +516,10 @@ def sendLoginActions(
         "inline_keyboard": [[{"text": "115扫码登录", "callback_data": "/wplogin"}]]
     }
 
-    plugin_dir = bot.plugin_dir
-
-    with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
-        photo = p.read()
-
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     status = bot.sendPhoto(
         chat_id=chat_id,
-        photo=photo,
+        photo=logo,
         reply_to_message_id=message_id,
         reply_markup=reply_markup,
     )
