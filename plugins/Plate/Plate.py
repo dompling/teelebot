@@ -8,7 +8,7 @@ from p115 import (
 import sys, os
 import errno
 from builtins import setattr
-import json, math, re
+import json, math, re, time
 
 
 cookie_path = "Plate/115-cookie.txt"
@@ -104,11 +104,11 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     header_buttons = [
         {
             "text": "🗑️取消",
-            "callback_data": f"{c}|d|0|{userid}",
+            "callback_data": f"{c}|d|{cid}|{userid}",
         },
         {
             "text": f"❤️{command_text[c]}",
-            "callback_data": f"{c}||{cid}|{userid}",
+            "callback_data": f"{c}|s|{cid}|{userid}",
         },
     ]
 
@@ -155,11 +155,6 @@ def Plate(bot, message):
         return
 
     if message["chat"]["type"] != "private":
-        admins = administrators(bot=bot, chat_id=chat_id)
-        admins.append(bot_id)
-        if str(root_id) not in admins:
-            admins.append(str(root_id))  # root permission
-
         results = bot.getChatAdministrators(chat_id=chat_id)  # 判断Bot是否具管理员权限
         admin_status = False
         for admin_user in results:
@@ -173,12 +168,6 @@ def Plate(bot, message):
             bot.message_deletor(gap, chat_id, message_id)
             return False
 
-        if str(user_id) not in admins:
-            msg = "权限不足，请授予全部权限以使用 Admin 插件。"
-            status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode="HTML")
-            bot.message_deletor(30, chat_id, status["message_id"])
-            return
-
     count = 0
     for c in command.keys():
         if c in str(text):
@@ -187,75 +176,75 @@ def Plate(bot, message):
     cookies = get_cookie(bot.path_converter(f"{bot.plugin_dir}{cookie_path}"))
     client = P115Client(cookies, app=available_app, check_for_relogin=True)
 
-    try:
-        # 检查登录
-        if client.login_status() == False and message_type != "callback_query_data":
-            sendLoginActions(bot, message)
-        # /wp 插件功能
-        elif text == prefix and count == 0:
-            status = bot.sendChatAction(chat_id=chat_id, action="typing")
-            msg = (
-                "<b>115网盘 插件功能</b>\n\n"
-                + "<b>/wpsave</b> - 引用链接保存到网盘\n"
-                + "<b>/wplogout</b> - 退出重新登录\n"
-                + "\n"
+    # try:
+    # 检查登录
+    if client.login_status() == False and message_type != "callback_query_data":
+        sendLoginActions(bot, message)
+    # /wp 插件功能
+    elif text == prefix and count == 0:
+        status = bot.sendChatAction(chat_id=chat_id, action="typing")
+        msg = (
+            "<b>115网盘 插件功能</b>\n\n"
+            + "<b>/wpsave</b> - 引用链接保存到网盘\n"
+            + "<b>/wplogout</b> - 退出重新登录\n"
+            + "\n"
+        )
+        status = bot.sendMessage(
+            chat_id=chat_id,
+            text=msg,
+            parse_mode="HTML",
+            reply_to_message_id=message["message_id"],
+        )
+        bot.message_deletor(10, chat_id, status["message_id"])
+    elif text == prefix + command["/wplogout"]:
+        client.logout()
+        sendLoginActions(bot, message)
+    # 命令插件功能
+    elif message_type == "callback_query_data":
+        reply_to_message = message.get("reply_to_message")
+        callback_query_data = message["callback_query_data"]
+        click_user_id = message["click_user"]["id"]
+        actions = callback_query_data.split("|")
+        if click_user_id == int(actions[3]):
+            if "login" in callback_query_data:
+                handle_login(bot, message, client)
+            elif "p=" in callback_query_data:
+                page = int(actions[1].split("=")[1])
+                handle_sendMessage(bot, message, client, actions, True, page)
+            elif prefix + command[actions[0]] == actions[0]:
+                handle_files_command(bot, message, client, actions)
+        else:
+            status = bot.answerCallbackQuery(
+                callback_query_id=message["callback_query_id"],
+                text="点啥点，关你啥事？",
+                show_alert=True,
             )
-            status = bot.sendMessage(
-                chat_id=chat_id,
-                text=msg,
-                parse_mode="HTML",
-                reply_to_message_id=message["message_id"],
+
+    elif "reply_to_message" in message.keys() and message_type != "callback_query_data":
+        #  初次发送引用内容
+        reply_to_message = message["reply_to_message"]
+        target_chat_id = reply_to_message["chat"]["id"]
+        if str(chat_id) == str(target_chat_id) and command.get(text):
+            handle_sendMessage(
+                bot=bot,
+                message=message,
+                client=client,
+                actions=[text, "c", 0, message["from"]["id"]],
+                is_edit=False,
             )
-            bot.message_deletor(10, chat_id, status["message_id"])
-        elif text == prefix + command["/wplogout"]:
-            client.logout()
-            sendLoginActions(bot, message)
-        # 命令插件功能
-        elif message_type == "callback_query_data":
-            reply_to_message = message.get("reply_to_message")
-            callback_query_data = message["callback_query_data"]
-            click_user_id = message["click_user"]["id"]
-            actions = callback_query_data.split("|")
-            if click_user_id == int(actions[3]):
-                if "login" in callback_query_data:
-                    handle_login(bot, message, client)
-                elif "p" in callback_query_data:
-                    page = int(actions[1].split("=")[1])
-                    handle_sendMessage(bot, message, client, actions, True, page)
-                elif prefix + command[actions[0]] == actions[0]:
-                    handle_files_command(bot, message, client, actions)
-            else:
-                status = bot.answerCallbackQuery(
-                    callback_query_id=message["callback_query_id"],
-                    text="点啥点，关你啥事？",
-                    show_alert=True,
-                )
 
-        elif (
-            "reply_to_message" in message.keys()
-            and message_type != "callback_query_data"
-        ):
-            #  初次发送引用内容
-            reply_to_message = message["reply_to_message"]
-            target_chat_id = reply_to_message["chat"]["id"]
-            if str(chat_id) == str(target_chat_id) and command.get(text):
-                client.fs.chdir(0)
-                handle_sendMessage(
-                    bot, message, client, [text, "c", 0, message["from"]["id"]], False
-                )
-
-        if "/wp" in text:
-            bot.message_deletor(5, message["chat"]["id"], message_id)
-    except Exception as e:
-        status = bot.sendMessage(chat_id=chat_id, text=f"响应失败\n{e}")
-        bot.message_deletor(2, message["chat"]["id"], status["message_id"])
-        bot.message_deletor(2, message["chat"]["id"], message_id)
+    if "/wp" in text:
+        bot.message_deletor(5, message["chat"]["id"], message_id)
+    # except Exception as e:
+    #     status = bot.sendMessage(chat_id=chat_id, text=f"响应失败\n{e}")
+    #     bot.message_deletor(2, message["chat"]["id"], status["message_id"])
+    #     bot.message_deletor(2, message["chat"]["id"], message_id)
 
 
 # 解析链接
 def macth_content(content):
     link = re.search(r"(https://115\.com/s/.*?password=.*?)\n", content)
-    
+
     if link:
         return "115_url", link.group(1)
 
@@ -304,7 +293,11 @@ def handle_sendMessage(
             message_id=message_id,
             reply_markup=get_page_btn(actions, client=client, current=page),
         )
-    bot.message_deletor(90, message["chat"]["id"], status["message_id"])
+    if status:
+        bot.message_deletor(90, message["chat"]["id"], status["message_id"])
+    else:
+        time.sleep(1)  # 睡眠1秒
+        handle_sendMessage(bot, message, client, actions, is_edit, page)
 
 
 # 处理目录操作
