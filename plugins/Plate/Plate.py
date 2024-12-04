@@ -335,13 +335,11 @@ def handle_command(bot, message, client: P115Client, actions):
     处理 command 列表中的命令
     actions 固定为 [命令,cid]
     """
-    message_id = message["message_id"]
     reply_to_message = message["reply_to_message"]
 
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
     share_type, url = macth_content(content)
 
-    bot.message_deletor(2, message["chat"]["id"], message_id)
     if command[actions[0]] == command["/wpsave"]:
         if share_type == "115_url":
             handle_save_share_url(bot, message, client, url, actions[1])
@@ -352,10 +350,15 @@ def handle_command(bot, message, client: P115Client, actions):
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     chat_id = message["chat"]["id"]
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
-    text = "离线任务保存成功"
+    text = message.get("text") + "\n离线任务保存成功"
     if response.get("error_msg"):
         text = response["error_msg"]
-    status = bot.sendMessage(chat_id=chat_id, text=text, parse_mode="HTML")
+    status = bot.editMessageCaption(
+        chat_id=chat_id,
+        caption=text,
+        message_id=message["message_id"],
+        reply_markup={"inline_keyboard": []},
+    )
     bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
 
@@ -364,7 +367,6 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
     pattern = r"^https?:\/\/115\.com\/s\/(?P<share_code>[a-zA-Z0-9]+)\?password=(?P<receive_code>[a-zA-Z0-9]+)#?$"
     match = re.match(pattern, url)
     chat_id = message["chat"]["id"]
-    message_id = message["message_id"]
 
     if match:
         share_code = match.group("share_code")
@@ -380,18 +382,25 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
             [item.get("fid", item.get("cid")) for item in list_data]
         )
         response = client.share_receive(share_params)
-        text = "分享保存成功"
+        text = message.get("text") + "\n分享任务保存成功"
         if response["error"]:
             text = response["error"]
-        status = bot.sendMessage(chat_id=chat_id, text=text, parse_mode="HTML")
+
+        status = bot.editMessageCaption(
+            chat_id=chat_id,
+            caption=text,
+            message_id=message["message_id"],
+            reply_markup={"inline_keyboard": []},
+        )
         bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
     else:
-        status = bot.sendMessage(
+        status = bot.editMessageCaption(
             chat_id=chat_id,
-            text="分享链接错误",
+            caption="分享链接错误",
             parse_mode="HTML",
-            reply_to_message_id=message_id,
+            message_id=message["message_id"],
+            reply_markup={"inline_keyboard": []},
         )
         bot.message_deletor(5, message["chat"]["id"], status["message_id"])
         return
