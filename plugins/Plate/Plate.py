@@ -184,64 +184,72 @@ def Plate(bot, message):
     cookies = get_cookie(bot.path_converter(f"{bot.plugin_dir}{cookie_path}"))
     client = P115Client(cookies, app=available_app, check_for_relogin=True)
 
-    # 检查登录
-    if client.login_status() == False and message_type != "callback_query_data":
-        sendLoginActions(bot, message)
-    # /wp 插件功能
-    elif text == prefix and count == 0:
-        status = bot.sendChatAction(chat_id=chat_id, action="typing")
-        msg = (
-            "<b>115网盘 插件功能</b>\n\n"
-            + "<b>/wpsave</b> - 引用链接保存到网盘\n"
-            + "<b>/wplogout</b> - 退出重新登录\n"
-            + "\n"
-        )
-        status = bot.sendMessage(
-            chat_id=chat_id,
-            text=msg,
-            parse_mode="HTML",
-            reply_to_message_id=message["message_id"],
-        )
-        bot.message_deletor(10, chat_id, status["message_id"])
-    elif text == prefix + command["/wplogout"]:
-        client.logout()
-        sendLoginActions(bot, message)
-    # 命令插件功能
-    elif message_type == "callback_query_data":
-        reply_to_message = message.get("reply_to_message")
-        callback_query_data = message["callback_query_data"]
-        click_user_id = message["click_user"]["id"]
-
-        if "reply_to_message" in message.keys():
-            from_user_id = reply_to_message["from"]["id"]
-        else:
-            from_user_id = bot.bot_id
-        if click_user_id == from_user_id:
-            call = callback_query_data.split(" ")
-            if "login" in callback_query_data:
-                handle_login(bot, message, client)
-            elif "page" in callback_query_data:
-                page = int(call[1].split("=")[1])
-                handle_sendMessage(bot, message, client, call, True, page)
-            elif prefix + command[call[0]] == call[0]:
-                handle_files_command(bot, message, client, call)
-        else:
-            status = bot.answerCallbackQuery(
-                callback_query_id=message["callback_query_id"],
-                text="点啥点，关你啥事？",
-                show_alert=True,
+    try:
+        # 检查登录
+        if client.login_status() == False and message_type != "callback_query_data":
+            sendLoginActions(bot, message)
+        # /wp 插件功能
+        elif text == prefix and count == 0:
+            status = bot.sendChatAction(chat_id=chat_id, action="typing")
+            msg = (
+                "<b>115网盘 插件功能</b>\n\n"
+                + "<b>/wpsave</b> - 引用链接保存到网盘\n"
+                + "<b>/wplogout</b> - 退出重新登录\n"
+                + "\n"
             )
+            status = bot.sendMessage(
+                chat_id=chat_id,
+                text=msg,
+                parse_mode="HTML",
+                reply_to_message_id=message["message_id"],
+            )
+            bot.message_deletor(10, chat_id, status["message_id"])
+        elif text == prefix + command["/wplogout"]:
+            client.logout()
+            sendLoginActions(bot, message)
+        # 命令插件功能
+        elif message_type == "callback_query_data":
+            reply_to_message = message.get("reply_to_message")
+            callback_query_data = message["callback_query_data"]
+            click_user_id = message["click_user"]["id"]
 
-    elif "reply_to_message" in message.keys() and message_type != "callback_query_data":
-        #  初次发送引用内容
-        reply_to_message = message["reply_to_message"]
-        target_chat_id = reply_to_message["chat"]["id"]
-        if str(chat_id) == str(target_chat_id) and command.get(text):
-            client.fs.chdir(0)
-            handle_sendMessage(bot, message, client, [text, "cd", 0], False)
+            if "reply_to_message" in message.keys():
+                from_user_id = reply_to_message["from"]["id"]
+            else:
+                from_user_id = bot.bot_id
+            if click_user_id == from_user_id:
+                call = callback_query_data.split(" ")
+                if "login" in callback_query_data:
+                    handle_login(bot, message, client)
+                elif "page" in callback_query_data:
+                    page = int(call[1].split("=")[1])
+                    handle_sendMessage(bot, message, client, call, True, page)
+                elif prefix + command[call[0]] == call[0]:
+                    handle_files_command(bot, message, client, call)
+            else:
+                status = bot.answerCallbackQuery(
+                    callback_query_id=message["callback_query_id"],
+                    text="点啥点，关你啥事？",
+                    show_alert=True,
+                )
 
-    if "/wp" in text:
-        bot.message_deletor(5, message["chat"]["id"], message_id)
+        elif (
+            "reply_to_message" in message.keys()
+            and message_type != "callback_query_data"
+        ):
+            #  初次发送引用内容
+            reply_to_message = message["reply_to_message"]
+            target_chat_id = reply_to_message["chat"]["id"]
+            if str(chat_id) == str(target_chat_id) and command.get(text):
+                client.fs.chdir(0)
+                handle_sendMessage(bot, message, client, [text, "cd", 0], False)
+
+        if "/wp" in text:
+            bot.message_deletor(5, message["chat"]["id"], message_id)
+    except Exception as e:
+        status = bot.sendMessage(chat_id=chat_id, text=f"响应失败\n{e}")
+        bot.message_deletor(2, message["chat"]["id"], status["message_id"])
+        bot.message_deletor(2, message["chat"]["id"], message_id)
 
 
 # 解析链接
@@ -348,7 +356,7 @@ def handle_command(bot, message, client: P115Client, actions):
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     chat_id = message["chat"]["id"]
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
-    text = message.get("text") + "\n离线任务保存成功"
+    text = message.get("caption", "") + "\n离线任务保存成功"
     if response.get("error_msg"):
         text = response["error_msg"]
     status = bot.editMessageCaption(
@@ -380,7 +388,7 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
             [item.get("fid", item.get("cid")) for item in list_data]
         )
         response = client.share_receive(share_params)
-        text = message.get("text") + "\n分享任务保存成功"
+        text = message.get("caption", "") + "\n分享任务保存成功"
         if response["error"]:
             text = response["error"]
 
