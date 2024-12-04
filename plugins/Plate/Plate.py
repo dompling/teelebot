@@ -73,7 +73,7 @@ def generate_pagination_keyboard(
 
     # 创建当前页面的按钮
     buttons = [
-        {"text": "📂" + d["name"] + ">", "callback_data": f"{commands} cd {d['id']}"}
+        {"text": "📂" + d["name"], "callback_data": f"{commands} cd {d['id']}"}
         for i, d in enumerate(directories[start:end], start=start)
     ]
 
