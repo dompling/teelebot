@@ -96,14 +96,18 @@ def generate_pagination_keyboard(
 
     header_buttons = [
         {
+            "text": "取消",
+            "callback_data": f"{commands} cancel",
+        },
+        {
             "text": f"{command_text[commands]}当前目录",
             "callback_data": f"{commands} {cid}",
-        }
+        },
     ]
 
     if int(cid) != 0:
         header_buttons.insert(
-            0, {"text": "上级目录", "callback_data": f"{commands} .. {cid}"}
+            1, {"text": "上级目录", "callback_data": f"{commands} .. {cid}"}
         )
 
     return build_menu(
@@ -310,7 +314,9 @@ def handle_sendMessage(
 
 # 处理目录操作
 def handle_files_command(bot, message, client: P115Client, actions=[]):
-    if actions[1] == "cd":
+    if actions[1] == "cancel":
+        bot.message_deletor(1, message["chat"]["id"], message["message_id"])
+    elif actions[1] == "cd":
         client.fs.chdir(int(actions[2]))
         handle_sendMessage(bot, message, client, actions)
     elif actions[1] == "..":
