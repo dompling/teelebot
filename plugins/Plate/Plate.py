@@ -411,7 +411,20 @@ def handle_login(bot, message, client: P115Client):
     response = client.login_qrcode_token()
     qrcode_token = response["data"]
     url = client.login_qrcode(qrcode_token["uid"])
-    status = bot.sendPhoto(chat_id=chat_id, photo=url, reply_to_message_id=message_id)
+    reply_markup = {
+        "inline_keyboard": [[{"text": "刷新二维码", "callback_data": "/wplogin"}]]
+    }
+
+    bot.message_deletor(1, chat_id, message_id)
+    status = bot.sendPhoto(
+        photo=url,
+        chat_id=chat_id,
+        caption="等待扫码中...",
+    )
+
+    message_id = status["message_id"]
+
+    status = bot.sendChatAction(chat_id=chat_id, action="typing")
 
     while True:
         try:
@@ -421,19 +434,51 @@ def handle_login(bot, message, client: P115Client):
         match resp["data"].get("status"):
             case 0:
                 print("[status=0] qrcode: waiting")
+                status = bot.editMessageCaption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption="等待扫码中...",
+                )
             case 1:
                 print("[status=1] qrcode: scanned")
+                status = bot.editMessageCaption(
+                    chat_id=chat_id, message_id=message_id, caption="扫码确认中..."
+                )
             case 2:
+                status = bot.editMessageCaption(
+                    chat_id=chat_id, message_id=message_id, caption="登录成功！！"
+                )
                 print("[status=2] qrcode: signed in")
                 resp = client.login_qrcode_scan_result(
                     uid=qrcode_token["uid"], app=available_app
                 )
                 break
             case -1:
+                status = bot.editMessageCaption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption="二维码已过期",
+                    reply_markup=reply_markup,
+                )
+                bot.message_deletor(5, chat_id, status["message_id"])
                 raise LoginError(errno.EIO, "[status=-1] qrcode: expired")
             case -2:
+                status = bot.editMessageCaption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption="扫码已取消",
+                    reply_markup=reply_markup,
+                )
+                bot.message_deletor(5, chat_id, status["message_id"])
                 raise LoginError(errno.EIO, "[status=-2] qrcode: canceled")
             case _:
+                status = bot.editMessageCaption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption="扫码拒绝",
+                    reply_markup=reply_markup,
+                )
+                bot.message_deletor(5, chat_id, status["message_id"])
                 raise LoginError(errno.EIO, f"qrcode: aborted with {resp!r}")
     bot.message_deletor(2, chat_id, status["message_id"])
     try:
@@ -449,7 +494,12 @@ def handle_login(bot, message, client: P115Client):
     )
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     msg = "🤖 115网盘登录成功\n📢请重新唤起机器人"
-    status = bot.sendMessage(chat_id=chat_id, text=msg)
+    status = bot.editMessageCaption(
+        chat_id=chat_id,
+        caption=msg,
+        message_id=message_id,
+        reply_markup={"inline_keyboard": []},
+    )
     bot.message_deletor(5, chat_id, status["message_id"])
 
     return resp
@@ -463,23 +513,18 @@ def sendLoginActions(
     message_id = message["message_id"]
 
     reply_markup = {
-        "inline_keyboard": [
-            {"text": "115扫码登录", "callback_data": f"-login"},
-        ]
+        "inline_keyboard": [[{"text": "115扫码登录", "callback_data": "/wplogin"}]]
     }
-    status = bot.sendChatAction(chat_id=chat_id, action="typing")
-    msg = ""
 
     plugin_dir = bot.plugin_dir
 
     with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
         photo = p.read()
 
+    status = bot.sendChatAction(chat_id=chat_id, action="typing")
     status = bot.sendPhoto(
         chat_id=chat_id,
         photo=photo,
-        caption=msg,
-        parse_mode="HTML",
         reply_to_message_id=message_id,
         reply_markup=reply_markup,
     )
