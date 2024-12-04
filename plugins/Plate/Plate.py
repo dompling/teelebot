@@ -73,7 +73,7 @@ def generate_pagination_keyboard(
 
     # 创建当前页面的按钮
     buttons = [
-        {"text": "📂" + d["name"], "callback_data": f"{commands} cd {d['id']}"}
+        {"text": "🏷️" + d["name"], "callback_data": f"{commands} cd {d['id']}"}
         for i, d in enumerate(directories[start:end], start=start)
     ]
 
@@ -96,18 +96,18 @@ def generate_pagination_keyboard(
 
     header_buttons = [
         {
-            "text": "取消",
+            "text": "🗑️取消",
             "callback_data": f"{commands} cancel",
         },
         {
-            "text": f"{command_text[commands]}当前目录",
+            "text": f"❤️{command_text[commands]}当前目录",
             "callback_data": f"{commands} {cid}",
         },
     ]
 
     if int(cid) != 0:
         header_buttons.insert(
-            1, {"text": "上级目录", "callback_data": f"{commands} .. {cid}"}
+            1, {"text": "🔙返回", "callback_data": f"{commands} .. {cid}"}
         )
 
     return build_menu(
