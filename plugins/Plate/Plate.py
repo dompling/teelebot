@@ -66,16 +66,21 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
     return menu
 
 
-def generate_pagination_keyboard(
-    commands, directories, current_page, total_pages, cid=0
-):
+def generate_pagination_keyboard(actions, directories, current_page, total_pages):
     # 计算当前页面的开始和结束索引
     start = current_page * ITEMS_PER_PAGE
     end = min((current_page + 1) * ITEMS_PER_PAGE, len(directories))
 
+    c = actions[0]
+    cid = actions[2]
+    userid = actions[3]
+
     # 创建当前页面的按钮
     buttons = [
-        {"text": "📂" + d["name"], "callback_data": f"{commands} cd {d['id']}"}
+        {
+            "text": "📂" + d["name"],
+            "callback_data": f"{c}|c|{d['id']}|{userid}",
+        }
         for i, d in enumerate(directories[start:end], start=start)
     ]
 
@@ -85,31 +90,31 @@ def generate_pagination_keyboard(
         footer_buttons.append(
             {
                 "text": "上一页",
-                "callback_data": f"{commands} page={current_page-1} {cid}",
+                "callback_data": f"{c}|p={current_page-1}|{cid}|{userid}",
             }
         )
     if current_page < total_pages - 1:
         footer_buttons.append(
             {
                 "text": "下一页",
-                "callback_data": f"{commands} page={current_page+1} {cid}",
+                "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
             }
         )
 
     header_buttons = [
         {
             "text": "🗑️取消",
-            "callback_data": f"{commands} cancel",
+            "callback_data": f"{c}|d|0|{userid}",
         },
         {
-            "text": f"❤️{command_text[commands]}",
-            "callback_data": f"{commands} {cid}",
+            "text": f"❤️{command_text[c]}",
+            "callback_data": f"{c}||{cid}|{userid}",
         },
     ]
 
     if int(cid) != 0:
         header_buttons.insert(
-            1, {"text": "🔙返回", "callback_data": f"{commands} .. {cid}"}
+            1, {"text": "🔙返回", "callback_data": f"{c}|.|{cid}|{userid}"}
         )
 
     return build_menu(
@@ -120,12 +125,10 @@ def generate_pagination_keyboard(
     )
 
 
-def get_page_btn(commands, client: P115Client, current, cid):
+def get_page_btn(actions, client: P115Client, current):
     folder = get_folder(client)
     total_pages = math.ceil(len(folder) / ITEMS_PER_PAGE)
-    inlineKeyboard = generate_pagination_keyboard(
-        commands, folder, current, total_pages, cid
-    )
+    inlineKeyboard = generate_pagination_keyboard(actions, folder, current, total_pages)
     reply_markup = {"inline_keyboard": inlineKeyboard}
     return reply_markup
 
@@ -212,20 +215,15 @@ def Plate(bot, message):
             reply_to_message = message.get("reply_to_message")
             callback_query_data = message["callback_query_data"]
             click_user_id = message["click_user"]["id"]
-
-            if "reply_to_message" in message.keys():
-                from_user_id = reply_to_message["from"]["id"]
-            else:
-                from_user_id = bot.bot_id
-            if click_user_id == from_user_id:
-                call = callback_query_data.split(" ")
+            actions = callback_query_data.split("|")
+            if click_user_id == int(actions[3]):
                 if "login" in callback_query_data:
                     handle_login(bot, message, client)
-                elif "page" in callback_query_data:
-                    page = int(call[1].split("=")[1])
-                    handle_sendMessage(bot, message, client, call, True, page)
-                elif prefix + command[call[0]] == call[0]:
-                    handle_files_command(bot, message, client, call)
+                elif "p" in callback_query_data:
+                    page = int(actions[1].split("=")[1])
+                    handle_sendMessage(bot, message, client, actions, True, page)
+                elif prefix + command[actions[0]] == actions[0]:
+                    handle_files_command(bot, message, client, actions)
             else:
                 status = bot.answerCallbackQuery(
                     callback_query_id=message["callback_query_id"],
@@ -242,7 +240,9 @@ def Plate(bot, message):
             target_chat_id = reply_to_message["chat"]["id"]
             if str(chat_id) == str(target_chat_id) and command.get(text):
                 client.fs.chdir(0)
-                handle_sendMessage(bot, message, client, [text, "cd", 0], False)
+                handle_sendMessage(
+                    bot, message, client, [text, "c", 0, message["from"]["id"]], False
+                )
 
         if "/wp" in text:
             bot.message_deletor(5, message["chat"]["id"], message_id)
@@ -255,8 +255,7 @@ def Plate(bot, message):
 # 解析链接
 def macth_content(content):
     link = re.search(r"(https://115\.com/s/.*?password=.*?)\n", content)
-
-    print(content)
+    
     if link:
         return "115_url", link.group(1)
 
@@ -296,42 +295,33 @@ def handle_sendMessage(
             photo=logo,
             parse_mode="HTML",
             reply_to_message_id=message_id,
-            reply_markup=get_page_btn(
-                f"{actions[0]}",
-                client=client,
-                current=page,
-                cid=actions[2],
-            ),
+            reply_markup=get_page_btn(actions, client=client, current=page),
         )
     else:
         status = bot.editMessageCaption(
             chat_id=chat_id,
             caption=msg,
             message_id=message_id,
-            reply_markup=get_page_btn(
-                f"{actions[0]}",
-                client=client,
-                current=page,
-                cid=actions[2],
-            ),
+            reply_markup=get_page_btn(actions, client=client, current=page),
         )
     bot.message_deletor(90, message["chat"]["id"], status["message_id"])
 
 
 # 处理目录操作
 def handle_files_command(bot, message, client: P115Client, actions=[]):
-    if actions[1] == "cancel":
+    if actions[1] == "d":
         bot.message_deletor(1, message["chat"]["id"], message["message_id"])
-    elif actions[1] == "cd":
+    elif actions[1] == "c":
         client.fs.chdir(int(actions[2]))
         handle_sendMessage(bot, message, client, actions)
-    elif actions[1] == "..":
+    elif actions[1] == ".":
         current_path = client.fs.get_path(actions[2])
         current_path = current_path.split("/")
         pre_path = "/".join(current_path[0:-1])
         client.fs.chdir(pre_path)
         cid = client.fs.getcid()
-        handle_sendMessage(bot, message, client, [actions[0], "cd", cid])
+        actions[2] = cid
+        handle_sendMessage(bot, message, client, actions)
     else:
         handle_command(bot, message, client, actions)
 
@@ -348,9 +338,9 @@ def handle_command(bot, message, client: P115Client, actions):
 
     if command[actions[0]] == command["/wpsave"]:
         if share_type == "115_url":
-            handle_save_share_url(bot, message, client, url, actions[1])
+            handle_save_share_url(bot, message, client, url, actions[2])
         elif share_type == "magent_url":
-            handle_magnet_url(bot, message, client, url, actions[1])
+            handle_magnet_url(bot, message, client, url, actions[2])
 
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
