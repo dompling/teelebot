@@ -15,17 +15,15 @@ cookie_path = "Plate/115-cookie.txt"
 available_app = "115android"
 
 command = {  # 命令注册
-    "/wpshare": "share",
+    "/wpsave": "save",
     "/wpupload": "upload",
     # "/wpdonwload": "download",
-    "/wpoff": "off",
     "/wplogout": "logout",
 }
 
 command_text = {  # 命令注册
-    "/wpshare": "网盘链接保存到",
+    "/wpsave": "保存到",
     "/wpupload": "上传到",
-    "/wpoff": "离线任务保存到",
     "/wplogut": "登出当前账号",
 }
 
@@ -139,11 +137,6 @@ def Plate(bot, message):
 
     callback_query_data = message.get("callback_query_data", None)
 
-    plugin_dir = bot.plugin_dir
-
-    with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
-        photo = p.read()
-
     prefix = ""
     ok, metadata = bot.metadata.read()
     if ok:
@@ -187,25 +180,13 @@ def Plate(bot, message):
 
     # 检查登录
     if client.login_status() == False and message_type != "callback_query_data":
-        status = sendLoginActions(
-            bot,
-            message,
-            photo,
-            [
-                [
-                    {"text": "115扫码登录", "callback_data": f"{prefix}-login"},
-                ],
-            ],
-        )
-        bot.message_deletor(8, chat_id, status["message_id"])
-        return
+        sendLoginActions(bot, message)
     # /wp 插件功能
     elif text == prefix and count == 0:
         status = bot.sendChatAction(chat_id=chat_id, action="typing")
         msg = (
             "<b>115网盘 插件功能</b>\n\n"
-            + "<b>/wpshare</b> - 引用分享链接保存到网盘\n"
-            + "<b>/wpoff</b> - 引用磁力链保存到网盘\n"
+            + "<b>/wpsave</b> - 引用链接保存到网盘\n"
             + "<b>/wplogout</b> - 退出重新登录\n"
             + "\n"
         )
@@ -216,21 +197,9 @@ def Plate(bot, message):
             reply_to_message_id=message["message_id"],
         )
         bot.message_deletor(10, chat_id, status["message_id"])
-        return
     elif text == prefix + command["/wplogout"]:
         client.logout()
-        status = sendLoginActions(
-            bot,
-            message,
-            photo,
-            [
-                [
-                    {"text": "115扫码登录", "callback_data": f"{prefix}-login"},
-                ],
-            ],
-        )
-        bot.message_deletor(8, chat_id, status["message_id"])
-        return
+        sendLoginActions(bot, message)
     # 命令插件功能
     elif message_type == "callback_query_data":
         reply_to_message = message.get("reply_to_message")
@@ -264,25 +233,28 @@ def Plate(bot, message):
         if str(chat_id) == str(target_chat_id) and command.get(text):
             client.fs.chdir(0)
             handle_sendMessage(bot, message, client, [text, "cd", 0], False)
-        return
+
+    if "/wp" in text:
+        bot.message_deletor(5, message["chat"]["id"], message_id)
 
 
 # 解析链接
 def macth_content(content):
     link = re.search(r"(https://115\.com/s/.*?password=.*?)\n", content)
-    print(link)
+
+    print(content)
     if link:
-        return link.group(1)
+        return "115_url", link.group(1)
 
     magnet_link = re.search(r"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}.*?)\n", content)
     if magnet_link:
-        return magnet_link.group(1)
+        return "magent_url", magnet_link.group(1)
 
     ed2k_link = re.search(r"(ed2k://\|file\|.*?\|/\n)", content)
     if ed2k_link:
-        return ed2k_link.group(1)
+        return "magent_url", ed2k_link.group(1)
 
-    return content
+    return False, content
 
 
 # 解析方式
@@ -294,6 +266,10 @@ def handle_sendMessage(
         当前目录：/ \n 引用内容xxx
         引用内容为操作的 115 链接，视频文件，磁力链等
     """
+    plugin_dir = bot.plugin_dir
+
+    with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
+        photo = p.read()
 
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
@@ -301,33 +277,35 @@ def handle_sendMessage(
 
     current_path = client.fs.getcwd()
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
-    header = "<b>当前目录：" + current_path + "</b>"
-    msg = []
-
+    msg = "当前目录：" + current_path
     if is_edit == False:
-        msg.append(header)
-        botAction = bot.sendMessage
-        bot.message_deletor(3, message["chat"]["id"], message_id)
         message_id = reply_to_message.get("message_id")
+        status = bot.sendPhoto(
+            chat_id=chat_id,
+            caption=msg,
+            photo=photo,
+            parse_mode="HTML",
+            reply_to_message_id=message_id,
+            reply_markup=get_page_btn(
+                f"{actions[0]}",
+                client=client,
+                current=page,
+                cid=actions[2],
+            ),
+        )
     else:
-        msg = message.get("text").split("\n")
-        msg[0] = header
-        botAction = bot.editMessageText
-    msg = "\n".join(msg)
-    status = botAction(
-        chat_id=chat_id,
-        text=msg,
-        parse_mode="HTML",
-        message_id=message_id,
-        reply_to_message_id=message_id,
-        reply_markup=get_page_btn(
-            f"{actions[0]}",
-            client=client,
-            current=page,
-            cid=actions[2],
-        ),
-    )
-    bot.message_deletor(50, message["chat"]["id"], status["message_id"])
+        status = bot.editMessageCaption(
+            chat_id=chat_id,
+            caption=msg,
+            message_id=message_id,
+            reply_markup=get_page_btn(
+                f"{actions[0]}",
+                client=client,
+                current=page,
+                cid=actions[2],
+            ),
+        )
+    bot.message_deletor(90, message["chat"]["id"], status["message_id"])
 
 
 # 处理目录操作
@@ -355,13 +333,14 @@ def handle_command(bot, message, client: P115Client, actions):
     reply_to_message = message["reply_to_message"]
 
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
-    url = macth_content(content)
-    
+    share_type, url = macth_content(content)
+
     bot.message_deletor(2, message["chat"]["id"], message_id)
-    if command[actions[0]] == command["/wpshare"]:
-        handle_save_share_url(bot, message, client, url, actions[1])
-    elif command[actions[0]] == command["/wpoff"]:
-        handle_magnet_url(bot, message, client, url, actions[1])
+    if command[actions[0]] == command["/wpsave"]:
+        if share_type == "115_url":
+            handle_save_share_url(bot, message, client, url, actions[1])
+        elif share_type == "magent_url":
+            handle_magnet_url(bot, message, client, url, actions[1])
 
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
@@ -476,13 +455,25 @@ def handle_login(bot, message, client: P115Client):
     return resp
 
 
-def sendLoginActions(bot, message, photo, inlineKeyboard):
+def sendLoginActions(
+    bot,
+    message,
+):
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
 
-    reply_markup = {"inline_keyboard": inlineKeyboard}
+    reply_markup = {
+        "inline_keyboard": [
+            {"text": "115扫码登录", "callback_data": f"-login"},
+        ]
+    }
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     msg = ""
+
+    plugin_dir = bot.plugin_dir
+
+    with open(bot.path_converter(plugin_dir + "Plate/icon.jpg"), "rb") as p:
+        photo = p.read()
 
     status = bot.sendPhoto(
         chat_id=chat_id,
@@ -493,6 +484,7 @@ def sendLoginActions(bot, message, photo, inlineKeyboard):
         reply_markup=reply_markup,
     )
 
+    bot.message_deletor(8, chat_id, status["message_id"])
     return status
 
 
