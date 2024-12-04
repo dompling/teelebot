@@ -351,18 +351,11 @@ def handle_command(bot, message, client: P115Client, actions):
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     chat_id = message["chat"]["id"]
-    message_id = message["message_id"]
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
-    path = client.fs.get_path(save_path)
-    text = "离线任务保存成功\n" + "<b>文件目录：" + path + "</b>"
+    text = "离线任务保存成功"
     if response.get("error_msg"):
         text = response["error_msg"]
-    status = bot.sendMessage(
-        chat_id=chat_id,
-        text=text,
-        parse_mode="HTML",
-        reply_to_message_id=message_id,
-    )
+    status = bot.sendMessage(chat_id=chat_id, text=text, parse_mode="HTML")
     bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
 
@@ -387,16 +380,10 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
             [item.get("fid", item.get("cid")) for item in list_data]
         )
         response = client.share_receive(share_params)
-        path = client.fs.get_path(save_path)
-        text = "分享保存成功\n" + "<b>" + path + "</b>"
+        text = "分享保存成功"
         if response["error"]:
             text = response["error"]
-        status = bot.sendMessage(
-            chat_id=chat_id,
-            text=text,
-            parse_mode="HTML",
-            reply_to_message_id=message_id,
-        )
+        status = bot.sendMessage(chat_id=chat_id, text=text, parse_mode="HTML")
         bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
     else:
