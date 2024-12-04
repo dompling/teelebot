@@ -22,7 +22,7 @@ command = {  # 命令注册
 }
 
 command_text = {  # 命令注册
-    "/wpsave": "保存到",
+    "/wpsave": "保存",
     "/wpupload": "上传到",
     "/wplogut": "登出当前账号",
 }
@@ -100,7 +100,7 @@ def generate_pagination_keyboard(
             "callback_data": f"{commands} cancel",
         },
         {
-            "text": f"❤️{command_text[commands]}当前目录",
+            "text": f"❤️{command_text[commands]}",
             "callback_data": f"{commands} {cid}",
         },
     ]
