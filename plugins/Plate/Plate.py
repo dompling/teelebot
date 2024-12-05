@@ -151,7 +151,7 @@ class SqliteDB(object):
         Delete
         """
         self.cursor.execute(
-            "DELETE FROM data WHERE user_id=? and type", (user_id, type)
+            "DELETE FROM data WHERE user_id=? and type=?", (user_id, type)
         )
 
         if self.cursor.rowcount == 1:
