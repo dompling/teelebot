@@ -235,7 +235,6 @@ def Plate(bot, message):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif check_user_admin(bot, message, super_admin, is_admin) == False:
                 return
-
             if text == "/wp":
                 return send_plugin_info(bot, chat_id, message_id)
             elif text.startswith("/wpconfig"):
