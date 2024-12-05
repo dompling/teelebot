@@ -159,6 +159,22 @@ class SqliteDB(object):
         else:
             return False
 
+    def update(self, user_id, type, content):
+        """
+        Insert
+        """
+        timestamp = int(time.time())
+        self.cursor.execute(
+            "UPDATE data Set (content, timestamp) VALUES (?,?) WHERE user_id=? and type=?",
+            (content, timestamp, user_id, type),
+        )
+
+        last_inserted_id = self.cursor.lastrowid
+        if self.cursor.rowcount == 1:
+            return last_inserted_id
+        else:
+            return False
+
 
 def Plate(bot, message):
     gap = 15
@@ -465,11 +481,19 @@ def handle_common_actions(bot, message, client, db: SqliteDB, default_actions=Fa
                     handle_magnet_url(bot, message, client, url, actions[2])
             elif command[actions[0]] == command["/wpcset"]:
                 click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
-                db.insert(
-                    user_id=click_user_id,
-                    content=actions[2],
-                    type=data_db_type["path"],
-                )
+                result = db.find(user_id=click_user_id, type=data_db_type["path"])
+                if result == False:
+                    db.insert(
+                        user_id=click_user_id,
+                        content=actions[2],
+                        type=data_db_type["path"],
+                    )
+                else:
+                    db.update(
+                        user_id=click_user_id,
+                        content=actions[2],
+                        type=data_db_type["path"],
+                    )
                 update_msg_text(bot, message, "✅设置网盘默认目录成功")
 
 
