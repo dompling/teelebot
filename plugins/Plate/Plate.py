@@ -165,7 +165,7 @@ class SqliteDB(object):
         """
         timestamp = int(time.time())
         self.cursor.execute(
-            "UPDATE data Set (content, timestamp) VALUES (?,?) WHERE user_id=? and type=?",
+            "UPDATE data Set content = ?,timestamp = ? WHERE user_id=? and type=?",
             (content, timestamp, user_id, type),
         )
 
@@ -408,7 +408,7 @@ def handle_wpconfig(bot, message, client, db: SqliteDB):
     msg = f"当前管理员:{user_name}"
     if result:
         cid = result["content"]
-        client.fs.chdir(cid)
+        client.fs.chdir(int(cid))
         current_path = client.fs.getcwd()
         msg += f"\n默认目录：{current_path}"
 
