@@ -230,7 +230,7 @@ def Plate(bot, message):
         if cookies:
             if super_admin == False and text.startswith("/wpadmin"):
                 return handle_admin_commands(bot, message, db, super_admin)
-            elif check_user_admin(bot, message, super_admin) == False:
+            elif check_user_admin(bot, message, super_admin, is_admin) == False:
                 return
 
             if text == "/wp":
@@ -285,7 +285,7 @@ def handle_callback_query(bot, message, callback_query_data):
     return True
 
 
-def check_user_admin(bot, message, super_admin):
+def check_user_admin(bot, message, super_admin, is_admin):
     """
     是否是Bot管理员验证登录
     """
@@ -297,6 +297,8 @@ def check_user_admin(bot, message, super_admin):
         msg = "🚫当前机器人暂无管理员\n请私聊执行<b>/wpadmin</b>"
     elif super_admin == False and chat_type == "private":
         msg = "🚫当前机器人暂无管理员\n请执行<b>/wpadmin</b>"
+    elif is_admin == False:
+        msg = "🚫您当前暂无机器人管理权限\n请私聊管理员获取"
     if msg:
         status = bot.sendPhoto(
             caption=msg,
