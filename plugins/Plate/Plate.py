@@ -215,7 +215,6 @@ def Plate(bot, message):
     admin = db.find(user_id=user_id, type=data_db_type["admin"])
 
     is_admin = admin
-
     if is_admin == False and super_admin:
         is_admin = super_admin["user_id"] == user_id
 
