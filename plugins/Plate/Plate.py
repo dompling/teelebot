@@ -386,7 +386,8 @@ def send_plugin_info(bot, chat_id, message_id):
         "<b>115网盘 插件功能</b>\n\n"
         + "<b>/wpsave</b> - 引用链接保存到网盘\n"
         + "<b>/wplogout</b> - 退出重新登录\n"
-        + "<b>/wpadmin</b> - 设置管理员"
+        + "<b>/wpadmin</b> - 设置管理员\n"
+        + "<b>/wpconfig</b> - 网盘目录配置"
     )
     status = bot.sendMessage(
         chat_id=chat_id,
