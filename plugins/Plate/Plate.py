@@ -236,7 +236,7 @@ def Plate(bot, message):
             if text == "/wp":
                 return send_plugin_info(bot, chat_id, message_id)
             elif text.startswith("/wpconfig"):
-                return handle_wpconfig(bot, message,client,db)
+                return handle_wpconfig(bot, message, client, db)
             elif text.startswith("/wplogout"):
                 return handle_logout(bot, message, client)
             elif text.startswith("/wpadmin"):
@@ -249,7 +249,11 @@ def Plate(bot, message):
     elif chat_type == "private":
         """处理私聊，直接保存功能"""
         if cookies and count == 0:
-            handle_wp_save(bot, message, client, db)
+            reply_to_message = message.get("reply_to_message", message)
+            content = reply_to_message.get("text", reply_to_message.get("caption", ""))
+            share_type = macth_content(content)
+            if share_type:
+                handle_wp_save(bot, message, client, db)
 
 
 def handle_wp_save(bot, message, client, db: SqliteDB):
