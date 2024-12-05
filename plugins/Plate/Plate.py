@@ -236,7 +236,7 @@ def Plate(bot, message):
             if text == "/wp":
                 return send_plugin_info(bot, chat_id, message_id)
             elif text.startswith("/wpconfig"):
-                return handle_wpconfig(bot, message)
+                return handle_wpconfig(bot, message,client,db)
             elif text.startswith("/wplogout"):
                 return handle_logout(bot, message, client)
             elif text.startswith("/wpadmin"):
@@ -398,13 +398,20 @@ def send_plugin_info(bot, chat_id, message_id):
     bot.message_deletor(10, chat_id, status["message_id"])
 
 
-def handle_wpconfig(bot, message):
+def handle_wpconfig(bot, message, client, db: SqliteDB):
     message_id = message.get("message_id", "")
     chat_id = message["chat"]["id"]
     user_name = message["from"]["username"]  # 点击者的用户 ID
     user_id = message["from"]["id"]  # 点击者的用户 ID
+    result = db.find(user_id=user_id, type=data_db_type["path"])
 
     msg = f"当前管理员:{user_name}"
+    if result:
+        cid = result["content"]
+        client.fs.chdir(cid)
+        current_path = client.fs.getcwd()
+        msg += f"\n默认目录：{current_path}"
+
     status = bot.sendPhoto(
         chat_id=chat_id,
         caption=msg,
