@@ -214,7 +214,10 @@ def Plate(bot, message):
     super_admin = db.find_type(data_db_type["super_admin"])
     admin = db.find(user_id=user_id, type=data_db_type["admin"])
 
-    is_admin = admin or super_admin
+    is_admin = admin
+
+    if is_admin == False and super_admin:
+        is_admin = super_admin["user_id"] == user_id
 
     if text[0:3] == prefix:
         bot.message_deletor(5, message["chat"]["id"], message_id)
