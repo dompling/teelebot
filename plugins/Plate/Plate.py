@@ -200,6 +200,13 @@ def Plate(bot, message):
             bot.message_deletor(gap, chat_id, message_id)
             return False
 
+    if (
+        text.startswith("/wp") == False
+        and chat_type != "private"
+        and message_type != "callback_query_data"
+    ):
+        return
+
     count = 0
     for c in command.keys():
         if c in str(text):
@@ -216,8 +223,8 @@ def Plate(bot, message):
 
     is_admin = admin
     if is_admin == False and super_admin:
-        is_admin = super_admin["user_id"] == user_id
-
+        is_admin = int(super_admin["user_id"]) == user_id
+    
     if text[0:3] == prefix:
         bot.message_deletor(5, message["chat"]["id"], message_id)
 
@@ -277,9 +284,8 @@ def handle_callback_query(bot, message, callback_query_data):
     # 解析回调数据
     actions = callback_query_data.split("|")
     click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
-
     # 检查是否是同一个用户
-    if click_user_id in actions:
+    if str(click_user_id) not in actions:
         # 如果不是同一个用户，拒绝操作
         bot.answerCallbackQuery(
             callback_query_id=message["callback_query_id"],
@@ -426,8 +432,8 @@ def handle_wpconfig(bot, message, client, db: SqliteDB):
         reply_markup={
             "inline_keyboard": [
                 [
-                    {"text": "设置默认目录", "callback_data": "/wpcset"},
-                    {"text": "删除默认目录", "callback_data": "/wpcdel"},
+                    {"text": "设置默认目录", "callback_data": f"/wpcset|{user_id}"},
+                    {"text": "删除默认目录", "callback_data": f"/wpcdel|{user_id}"},
                 ],
                 [
                     {"text": "取消", "callback_data": f"/wpconfig|d|0|{user_id}"},
@@ -446,14 +452,13 @@ def handle_common_actions(bot, message, client, db: SqliteDB, default_actions=Fa
         callback_query_data = message.get("callback_query_data")
         actions = callback_query_data.split("|")
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,s执行)，3：目录 id,4:用户 id
-
-    if len(actions) == 1:
+    if len(actions) != 4:
         if command[actions[0]] == command["/wpcset"]:
             handle_sendMessage(
                 bot=bot,
                 message=message,
                 client=client,
-                actions=[actions[0], "c", 0, message["from"]["id"]],
+                actions=[actions[0], "c", 0, actions[1]],
             )
         elif command[actions[0]] == command["/wpcdel"]:
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
