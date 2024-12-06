@@ -8,8 +8,10 @@ from p115 import (
 import sys, os
 import errno
 from builtins import setattr
-import json, math, re, time, sqlite3
+import json, math, re, time, sqlite3, requests
 import teelebot
+from collections import deque
+from time import perf_counter
 
 
 cookie_path = "Plate/115-cookie.txt"
@@ -28,11 +30,13 @@ command = {  # 命令注册
     "/wpcdel": "cdel",
     "/wplogout": "logout",
     "/wplogin": "login",
+    "/wprec": "rec",
+    "/wprecp": "recp",
 }
 
 command_text = {  # 命令注册
     "/wpsave": "保存",
-    "/wpupload": "上传到",
+    "/wpupload": "上传",
     "/wpconfig": "115网盘设置",
     "/wpcset": "默认到",
     "/wpcdel": "删除默认",
@@ -51,7 +55,12 @@ with open(teelebot.bot.path_converter(log_dir), "rb") as p:
     logo = p.read()
 
 
-data_db_type = {"admin": "admin", "super_admin": "super_admin", "path": "path"}
+data_db_type = {
+    "path": "path",
+    "admin": "admin",
+    "rec_pwd": "rec_pwd",
+    "super_admin": "super_admin",
+}
 
 
 class SqliteDB(object):
@@ -185,6 +194,22 @@ class SqliteDB(object):
         else:
             return False
 
+    def update_type(self, type, content):
+        """
+        Insert
+        """
+        timestamp = int(time.time())
+        self.cursor.execute(
+            "UPDATE data Set content = ?,timestamp = ? WHERE type=?",
+            (content, timestamp, type),
+        )
+
+        last_inserted_id = self.cursor.lastrowid
+        if self.cursor.rowcount == 1:
+            return last_inserted_id
+        else:
+            return False
+
 
 def Plate(bot, message):
     gap = 15
@@ -215,6 +240,9 @@ def Plate(bot, message):
         and chat_type != "private"
         and message_type != "callback_query_data"
     ):
+        return
+
+    if str(user_id) == bot_id and message_type != "callback_query_data":
         return
 
     count = 0
@@ -255,12 +283,18 @@ def Plate(bot, message):
                 return send_plugin_info(bot, chat_id, message_id)
             elif text.startswith("/wpconfig"):
                 return handle_wpconfig(bot, message, client, db)
+            elif text.startswith("/wprecp"):
+                return handle_set_recycle_pwd(bot, message, db, user_id)
             elif text.startswith("/wplogout"):
                 return handle_logout(bot, message, client)
             elif text.startswith("/wpadmin"):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif text.startswith("/wpsave"):
                 return handle_wp_save(bot, message, client, db)
+            elif text.startswith("/wpupload") and message.get("reply_to_message"):
+                return handle_save_file(
+                    bot, message.get("reply_to_message"), client, db
+                )
         else:
             handle_login(bot, message)
 
@@ -272,6 +306,52 @@ def Plate(bot, message):
             share_type = macth_content(content)
             if share_type:
                 handle_wp_save(bot, message, client, db)
+            elif "photo" == message_type:
+                handle_save_file(bot, message, client, db)
+
+
+def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
+    user_id = message["from"]["id"]
+    user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
+    if user_default_path == False:
+        return
+
+    file_id = ""
+    file_size = -1
+    file_name = ""
+    if message.get("photo"):
+        photo = max(message["photo"], key=lambda x: x["file_size"])
+        file_id = photo["file_id"]
+        file_size = photo["file_size"]
+        file_name = photo["file_unique_id"] + ".png"
+    elif message.get("video"):
+        file_id = message["video"]["file_id"]
+        file_size = message["video"]["file_size"]
+        file_name = message["video"]["file_name"]
+
+    if file_id:
+        file_dl_path = bot.getFileDownloadPath(file_id=file_id)
+        req = requests.get(url=file_dl_path)
+        if type(req.content) == bytes:
+            file_content = req.content
+        else:
+            file_content = file_dl_path
+
+        chat_id = message["chat"]["id"]
+        status = bot.sendMessage(chat_id=chat_id, text="💾上传中...", parse_mode="HTML")
+        bot.message_deletor(5, chat_id, status["message_id"])
+
+        resp = client.upload_file(
+            file=file_content,
+            pid=int(user_default_path["content"]),
+            filesize=file_size,
+            partsize=5,
+            filename=file_name,
+        )
+        msg = f"上传成功"
+        if resp["error"]:
+            msg = resp["error"]
+        update_msg_text(bot, message, msg)
 
 
 def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
@@ -290,10 +370,27 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
         handle_common_actions(bot, message, client, db, actions)
 
 
-def handle_callback_query(bot, message, callback_query_data):
+def handle_save_action(bot, message, client: P115Client, action: str):
+    reply_to_message = message.get("reply_to_message", message)
+    content = reply_to_message.get("text", reply_to_message.get("caption", ""))
+    share_type, url = macth_content(content)
+    if share_type == "115_url":
+        handle_save_share_url(bot, message, client, url, action)
+    elif share_type == "magent_url":
+        handle_magnet_url(bot, message, client, url, action)
+
+
+def handle_callback_query(bot, message, callback_query_data: str):
     # 解析回调数据
     actions = callback_query_data.split("|")
     click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
+    if not command.get(actions[0]):
+        bot.answerCallbackQuery(
+            callback_query_id=message["callback_query_id"],
+            text=f"🚫 未注册命令{actions[0]}？",
+            show_alert=True,
+        )
+        return False
     # 检查是否是同一个用户
     if str(click_user_id) not in actions:
         # 如果不是同一个用户，拒绝操作
@@ -306,7 +403,7 @@ def handle_callback_query(bot, message, callback_query_data):
     return True
 
 
-def check_user_admin(bot, message, super_admin, is_admin):
+def check_user_admin(bot, message, super_admin: bool, is_admin: bool):
     """
     是否是Bot管理员验证登录
     """
@@ -333,7 +430,7 @@ def check_user_admin(bot, message, super_admin, is_admin):
     return True
 
 
-def handle_admin_commands(bot, message, db: SqliteDB, super_admin):
+def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
     message_id = message["message_id"]
     chat_id = message["chat"]["id"]
     user_id = message["from"]["id"]
@@ -411,7 +508,8 @@ def send_plugin_info(bot, chat_id, message_id):
         + "<b>/wpsave</b> - 引用链接保存到网盘\n"
         + "<b>/wplogout</b> - 退出重新登录\n"
         + "<b>/wpadmin</b> - 设置管理员\n"
-        + "<b>/wpconfig</b> - 网盘目录配置"
+        + "<b>/wpconfig</b> - 网盘配置"
+        + "<b>/wprecp</b> - 回收站密码（命令+空格+密码）"
     )
     status = bot.sendMessage(
         chat_id=chat_id,
@@ -464,6 +562,9 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                     {"text": "删除默认目录", "callback_data": f"/wpcdel|{user_id}"},
                 ],
                 [
+                    {"text": "清空回收站", "callback_data": f"/wprec|{user_id}"},
+                ],
+                [
                     {"text": "取消", "callback_data": f"/wpconfig|d|0|{user_id}"},
                 ],
             ]
@@ -483,31 +584,32 @@ def handle_common_actions(
         actions = callback_query_data.split("|")
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,s执行)，3：目录 id,4:用户 id
     if len(actions) != 4:
-        if command[actions[0]] == command["/wpcset"]:
-            handle_sendMessage(
-                bot=bot,
-                message=message,
-                client=client,
-                actions=[actions[0], "c", 0, actions[1]],
-            )
-        elif command[actions[0]] == command["/wpcdel"]:
+        if actions[0] == "/wpcset":
+            actions = [actions[0], "c", 0, actions[1]]
+            handle_sendMessage(bot, message, client, actions)
+        elif actions[0] == "/wpcdel":
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
             db.delete(click_user_id, data_db_type["path"])
             update_msg_text(bot, message, "✅删除网盘默认目录成功")
         elif actions[0] == "/wplogin":
             handle_qrcode_login(bot=bot, message=message, client=client)
+        elif actions[0] == "/wprec":
+            handle_clear_recycle(bot, message, client, db)
     else:
         if "p=" in actions[1]:
             """目录翻页"""
             page = int(actions[1].split("=")[1])
             handle_sendMessage(bot, message, client, actions, True, page)
+
         if actions[1] == "d":
             """取消目录消息"""
             bot.message_deletor(1, message["chat"]["id"], message["message_id"])
+
         elif actions[1] == "c":
             """进入目录消息"""
             client.fs.chdir(int(actions[2]))
             handle_sendMessage(bot, message, client, actions)
+
         elif actions[1] == ".":
             """返回上级目录"""
             current_path = client.fs.get_path(actions[2])
@@ -517,34 +619,59 @@ def handle_common_actions(
             cid = client.fs.getcid()
             actions[2] = cid
             handle_sendMessage(bot, message, client, actions)
+
         elif actions[1] == "s":
             """执行当前目录功能"""
             if command[actions[0]] == command["/wpsave"]:
-                reply_to_message = message.get("reply_to_message", message)
-                content = reply_to_message.get(
-                    "text", reply_to_message.get("caption", "")
-                )
-                share_type, url = macth_content(content)
-                if share_type == "115_url":
-                    handle_save_share_url(bot, message, client, url, actions[2])
-                elif share_type == "magent_url":
-                    handle_magnet_url(bot, message, client, url, actions[2])
+                handle_save_action(bot, message, client, actions[2])
+
             elif command[actions[0]] == command["/wpcset"]:
-                click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
-                result = db.find(user_id=click_user_id, type=data_db_type["path"])
-                if result == False:
-                    db.insert(
-                        user_id=click_user_id,
-                        content=actions[2],
-                        type=data_db_type["path"],
-                    )
-                else:
-                    db.update(
-                        user_id=click_user_id,
-                        content=actions[2],
-                        type=data_db_type["path"],
-                    )
-                update_msg_text(bot, message, "✅设置网盘默认目录成功")
+                handle_set_default_path(bot, message, db, actions[2])
+
+
+def handle_clear_recycle(bot, message, client: P115Client, db: SqliteDB):
+    result = db.find_type(data_db_type["rec_pwd"])
+    if result == False:
+        msg = "🚫暂未设置清空回收站密码"
+        return update_msg_text(bot, message, msg)
+    rec_pwd = result["content"]
+    response = client.recyclebin_clean({"password": rec_pwd})
+    msg = "✅清空回收站成功"
+    if response["error"]:
+        msg = response["error"]
+    return update_msg_text(bot, message, msg)
+
+
+def handle_set_recycle_pwd(bot, message, db: SqliteDB, user_id):
+    try:
+        result = db.find_type(data_db_type["rec_pwd"])
+        cmd, pwd = message.get("text", "").split(" ")
+        if result == False:
+            db.insert(user_id, pwd, data_db_type["rec_pwd"])
+        else:
+            db.update_type(data_db_type["rec_pwd"], pwd)
+        msg = "✅回收站密码设置成功"
+        return update_msg_text(bot, message, msg)
+    except ValueError:
+        return update_msg_text(bot, message, "🚫密码设置失败，请检查")
+
+
+def handle_set_default_path(bot, message, db: SqliteDB, action):
+    click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
+    result = db.find(user_id=click_user_id, type=data_db_type["path"])
+    if result == False:
+        db.insert(
+            user_id=click_user_id,
+            content=action,
+            type=data_db_type["path"],
+        )
+    else:
+        db.update(
+            user_id=click_user_id,
+            content=action,
+            type=data_db_type["path"],
+        )
+    update_msg_text(bot, message, "✅设置网盘默认目录成功")
 
 
 def handle_logout(bot, message, client: P115Client):
@@ -837,3 +964,34 @@ def macth_content(content):
         return "magent_url", ed2k_link.group(1)
 
     return False, content
+
+
+def make_report(total: None | int = None):
+    dq: deque[tuple[int, float]] = deque(maxlen=64)
+    push = dq.append
+    read_num = 0
+    push((read_num, perf_counter()))
+    while True:
+        read_num += yield
+        cur_t = perf_counter()
+        speed = (read_num - dq[0][0]) / 1024 / 1024 / (cur_t - dq[0][1])
+        if total:
+            percentage = read_num / total * 100
+            msg = (
+                f"\r\x1b[K{read_num} / {total} | {speed:.2f} MB/s | {percentage:.2f} %"
+            )
+            print(msg, end="", flush=True)
+            bot.editMessageText(
+                chat_id=message["chat"]["id"],
+                message_id=message["message_id"],
+                text=msg,
+            )
+        else:
+            msg = f"\r\x1b[K{read_num} | {speed:.2f} MB/s"
+            print(msg, end="", flush=True)
+            bot.editMessageText(
+                chat_id=message["chat"]["id"],
+                message_id=message["message_id"],
+                text=msg,
+            )
+        push((read_num, cur_t))
