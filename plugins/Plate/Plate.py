@@ -9,6 +9,7 @@ import sys, os
 import errno
 from builtins import setattr
 import json, math, re, time, sqlite3
+import teelebot
 
 
 cookie_path = "Plate/115-cookie.txt"
@@ -40,6 +41,12 @@ command_text = {  # 命令注册
 ITEMS_PER_PAGE = 5
 
 logo = "https://raw.githubusercontent.com/dompling/teelebot/refs/heads/plugin/plugins/Plate/icon.jpg"
+
+log_dir = teelebot.bot.plugin_dir + "Plate/icon.jpg"
+
+with open(teelebot.bot.path_converter(log_dir), "rb") as p:
+    logo = p.read()
+
 
 data_db_type = {"admin": "admin", "super_admin": "super_admin", "path": "path"}
 
@@ -224,7 +231,7 @@ def Plate(bot, message):
     is_admin = admin
     if is_admin == False and super_admin:
         is_admin = int(super_admin["user_id"]) == user_id
-    
+
     if text[0:3] == prefix:
         bot.message_deletor(5, message["chat"]["id"], message_id)
 
@@ -236,7 +243,7 @@ def Plate(bot, message):
         return handle_common_actions(bot, message, client, db)
 
     elif text.startswith("/wp"):
-        if cookies:
+        if client.login_status():
             if super_admin == False and text.startswith("/wpadmin"):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif check_user_admin(bot, message, super_admin, is_admin) == False:
@@ -264,7 +271,7 @@ def Plate(bot, message):
                 handle_wp_save(bot, message, client, db)
 
 
-def handle_wp_save(bot, message, client, db: SqliteDB):
+def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
     user_id = message["from"]["id"]
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
     if user_default_path == False:
@@ -378,8 +385,11 @@ def handle_login(bot, message):
     """登录"""
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
+    user_id = message["from"]["id"]
     reply_markup = {
-        "inline_keyboard": [[{"text": "115扫码登录", "callback_data": "/wplogin"}]]
+        "inline_keyboard": [
+            [{"text": "115扫码登录", "callback_data": f"/wplogin|{user_id}"}]
+        ]
     }
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     status = bot.sendPhoto(
@@ -409,19 +419,34 @@ def send_plugin_info(bot, chat_id, message_id):
     bot.message_deletor(10, chat_id, status["message_id"])
 
 
-def handle_wpconfig(bot, message, client, db: SqliteDB):
+def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
     message_id = message.get("message_id", "")
     chat_id = message["chat"]["id"]
     user_name = message["from"]["username"]  # 点击者的用户 ID
     user_id = message["from"]["id"]  # 点击者的用户 ID
     result = db.find(user_id=user_id, type=data_db_type["path"])
 
-    msg = f"当前管理员:{user_name}"
+    msg = f"<b>当前管理员:{user_name}</b>"
     if result:
         cid = result["content"]
         client.fs.chdir(int(cid))
         current_path = client.fs.getcwd()
-        msg += f"\n默认目录：{current_path}"
+        if current_path == "/":
+            current_path = "根目录"
+        msg += f"\n<b>默认保存：{current_path}</b>"
+        
+    fs_info = client.fs_index_info()
+    if fs_info["error"] == "":
+        wp_info = fs_info["data"]
+        device_list = wp_info["login_devices_info"]["list"]
+        use_info = (
+            wp_info["space_info"]["all_use"]["size_format"]
+            + "/"
+            + wp_info["space_info"]["all_total"]["size_format"]
+        )
+        device_names = ", ".join([device["name"] for device in device_list])
+        msg += f"\n<b>网盘容量：{use_info}</b>"
+        msg += f"\n<b>已登设备：{device_names}</b>"
 
     status = bot.sendPhoto(
         chat_id=chat_id,
@@ -444,7 +469,9 @@ def handle_wpconfig(bot, message, client, db: SqliteDB):
     bot.message_deletor(90, message["chat"]["id"], status["message_id"])
 
 
-def handle_common_actions(bot, message, client, db: SqliteDB, default_actions=False):
+def handle_common_actions(
+    bot, message, client: P115Client, db: SqliteDB, default_actions=False
+):
     """通用actions处理"""
     if default_actions:
         actions = default_actions
@@ -517,7 +544,7 @@ def handle_common_actions(bot, message, client, db: SqliteDB, default_actions=Fa
                 update_msg_text(bot, message, "✅设置网盘默认目录成功")
 
 
-def handle_logout(bot, message, client):
+def handle_logout(bot, message, client: P115Client):
     """处理退出登录"""
     client.logout()
     handle_login(bot=bot, message=message)
@@ -568,7 +595,7 @@ def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
     text = message.get("caption", "") + "\n离线任务保存成功"
     if response.get("error_msg"):
-        text = response["error_msg"]
+        text = "🚫" + response["error_msg"]
     update_msg_text(bot, message, text)
 
 
@@ -593,11 +620,11 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
         response = client.share_receive(share_params)
         text = message.get("caption", "") + "\n分享任务保存成功"
         if response["error"]:
-            text = response["error"]
+            text = "🚫" + response["error"]
         update_msg_text(bot, message, text)
 
     else:
-        update_msg_text(bot, message, "分享链接错误")
+        update_msg_text(bot, message, "🚫分享链接错误")
 
 
 # 登录
@@ -633,16 +660,16 @@ def handle_qrcode_login(bot, message, client: P115Client):
                 status = bot.editMessageCaption(
                     chat_id=chat_id,
                     message_id=message_id,
-                    caption="等待扫码中...",
+                    caption="✅等待扫码中...",
                 )
             case 1:
                 print("[status=1] qrcode: scanned")
                 status = bot.editMessageCaption(
-                    chat_id=chat_id, message_id=message_id, caption="扫码确认中..."
+                    chat_id=chat_id, message_id=message_id, caption="✅扫码确认中..."
                 )
             case 2:
                 status = bot.editMessageCaption(
-                    chat_id=chat_id, message_id=message_id, caption="登录成功！！"
+                    chat_id=chat_id, message_id=message_id, caption="✅登录成功！！"
                 )
                 print("[status=2] qrcode: signed in")
                 resp = client.login_qrcode_scan_result(
@@ -650,13 +677,13 @@ def handle_qrcode_login(bot, message, client: P115Client):
                 )
                 break
             case -1:
-                update_msg_text(bot, message, "二维码已过期", reply_markup)
+                update_msg_text(bot, message, "🚫二维码已过期", reply_markup)
                 raise LoginError(errno.EIO, "[status=-1] qrcode: expired")
             case -2:
-                update_msg_text(bot, message, "扫码已取消", reply_markup)
+                update_msg_text(bot, message, "🚫扫码已取消", reply_markup)
                 raise LoginError(errno.EIO, "[status=-2] qrcode: canceled")
             case _:
-                update_msg_text(bot, message, "扫码拒绝", reply_markup)
+                update_msg_text(bot, message, "🚫扫码拒绝", reply_markup)
                 raise LoginError(errno.EIO, f"qrcode: aborted with {resp!r}")
     bot.message_deletor(2, chat_id, status["message_id"])
     try:
