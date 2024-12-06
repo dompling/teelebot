@@ -426,14 +426,14 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
     user_id = message["from"]["id"]  # 点击者的用户 ID
     result = db.find(user_id=user_id, type=data_db_type["path"])
 
-    msg = f"<b>当前管理员:{user_name}</b>"
+    msg = f"<b>🖥️当前管理:{user_name}</b>"
     if result:
         cid = result["content"]
         client.fs.chdir(int(cid))
         current_path = client.fs.getcwd()
         if current_path == "/":
             current_path = "根目录"
-        msg += f"\n<b>默认保存：{current_path}</b>"
+        msg += f"\n<b>🗂️默认保存：{current_path}</b>"
         
     fs_info = client.fs_index_info()
     if fs_info["error"] == "":
@@ -445,8 +445,8 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
             + wp_info["space_info"]["all_total"]["size_format"]
         )
         device_names = ", ".join([device["name"] for device in device_list])
-        msg += f"\n<b>网盘容量：{use_info}</b>"
-        msg += f"\n<b>已登设备：{device_names}</b>"
+        msg += f"\n<b>⏲️网盘容量：{use_info}</b>"
+        msg += f"\n<b>📟已登设备：{device_names}</b>"
 
     status = bot.sendPhoto(
         chat_id=chat_id,
