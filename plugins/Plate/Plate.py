@@ -17,6 +17,9 @@ available_app = "115android"
 
 prefix = "/wp"
 
+url_115_params = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/(?P<share_code>[a-zA-Z0-9]+)(?:\?password=(?P<receive_code>[a-zA-Z0-9]+))?"
+url_115_rex = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/([a-zA-Z0-9]+)(?:\?password=([a-zA-Z0-9]+))?"
+
 command = {  # 命令注册
     "/wpsave": "save",
     "/wpupload": "upload",
@@ -434,7 +437,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
         if current_path == "/":
             current_path = "根目录"
         msg += f"\n<b>🗂️默认保存：{current_path}</b>"
-        
+
     fs_info = client.fs_index_info()
     if fs_info["error"] == "":
         wp_info = fs_info["data"]
@@ -601,8 +604,7 @@ def handle_magnet_url(bot, message, client: P115Client, url, save_path):
 
 # 保存分享链接
 def handle_save_share_url(bot, message, client: P115Client, url, save_path):
-    pattern = r"^https?:\/\/115\.com\/s\/(?P<share_code>[a-zA-Z0-9]+)\?password=(?P<receive_code>[a-zA-Z0-9]+)#?$"
-    match = re.match(pattern, url)
+    match = re.match(url_115_params, url)
 
     if match:
         share_code = match.group("share_code")
@@ -822,14 +824,13 @@ def get_page_btn(actions, client: P115Client, current):
 
 # 解析链接
 def macth_content(content):
-    link = re.search(r"(https://115\.com/s/.*?password=.*?)\n", content)
-
+    link = re.search(url_115_rex, content)
     if link:
-        return "115_url", link.group(1)
+        return "115_url", link.group(0)
 
-    magnet_link = re.search(r"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40}.*?)\n", content)
+    magnet_link = re.search(r"magnet:\?xt=urn:btih:[0-9a-fA-F]{40,}.*", content)
     if magnet_link:
-        return "magent_url", magnet_link.group(1)
+        return "magent_url", magnet_link.group(0)
 
     ed2k_link = re.search(r"(ed2k://\|file\|.*?\|/\n)", content)
     if ed2k_link:
