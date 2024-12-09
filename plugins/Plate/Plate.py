@@ -24,7 +24,6 @@ url_115_rex = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/([a-zA-Z0-9]+)(?:\?passwo
 
 command = {  # 命令注册
     "/wpsave": "save",
-    "/wpupload": "upload",
     "/wpconfig": "config",
     "/wpcset": "cset",
     "/wpcdel": "cdel",
@@ -36,7 +35,6 @@ command = {  # 命令注册
 
 command_text = {  # 命令注册
     "/wpsave": "保存",
-    "/wpupload": "上传",
     "/wpconfig": "115网盘设置",
     "/wpcset": "默认到",
     "/wpcdel": "删除默认",
@@ -291,10 +289,6 @@ def Plate(bot, message):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif text.startswith("/wpsave"):
                 return handle_wp_save(bot, message, client, db)
-            elif text.startswith("/wpupload") and message.get("reply_to_message"):
-                return handle_save_file(
-                    bot, message.get("reply_to_message"), client, db
-                )
         else:
             handle_login(bot, message)
 
@@ -306,8 +300,6 @@ def Plate(bot, message):
             share_type = macth_content(content)
             if share_type:
                 handle_wp_save(bot, message, client, db)
-            elif "photo" == message_type:
-                handle_save_file(bot, message, client, db)
 
 
 def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
@@ -370,14 +362,17 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
         handle_common_actions(bot, message, client, db, actions)
 
 
-def handle_save_action(bot, message, client: P115Client, action: str):
+def handle_save_action(bot, message, client: P115Client, action: str, db: SqliteDB):
     reply_to_message = message.get("reply_to_message", message)
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
+    message_type = reply_to_message.get("message_type")
     share_type, url = macth_content(content)
     if share_type == "115_url":
         handle_save_share_url(bot, message, client, url, action)
     elif share_type == "magent_url":
         handle_magnet_url(bot, message, client, url, action)
+    elif message_type in ["video", "photo"]:
+        handle_save_file(bot, message, client, db)
 
 
 def handle_callback_query(bot, message, callback_query_data: str):
@@ -623,7 +618,7 @@ def handle_common_actions(
         elif actions[1] == "s":
             """执行当前目录功能"""
             if command[actions[0]] == command["/wpsave"]:
-                handle_save_action(bot, message, client, actions[2])
+                handle_save_action(bot, message, client, actions[2], db)
 
             elif command[actions[0]] == command["/wpcset"]:
                 handle_set_default_path(bot, message, db, actions[2])
