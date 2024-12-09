@@ -12,7 +12,7 @@ RUN apk add --no-cache --virtual .build-deps tzdata \
     && mkdir /config && mkdir /plugins
 
 RUN apk add  --no-cache gcc musl-dev linux-headers\
-    && apk add  --no-cache liblz4-dev lz4-dev
+    && apk add  --no-cache liblz4-dev lz4-dev \
     && pip install lz4\
     && pip3 install -U python-115 
 
