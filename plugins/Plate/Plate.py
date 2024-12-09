@@ -590,15 +590,22 @@ def handle_common_actions(
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
+            
         elif actions[0] == "/wpcdel":
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
             db.delete(click_user_id, data_db_type["path"])
             update_msg_text(bot, message, "✅删除网盘默认目录成功")
+            
         elif actions[0] == "/wplogin":
             handle_qrcode_login(bot=bot, message=message, client=client)
+            
         elif actions[0] == "/wprec":
             handle_clear_recycle(bot, message, client, db)
+            
         elif actions[0] == "/wpdel":
+            result = db.find(user_id=click_user_id, type=data_db_type["path"])
+            if result:
+                client.fs.chdir(int(result["content"]))
             handle_sendMessage(bot, message, client, actions, True, 0, True)
     else:
         if "p=" in actions[1]:
