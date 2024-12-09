@@ -11,7 +11,8 @@ RUN apk add --no-cache --virtual .build-deps tzdata \
     && pip3 install --no-cache-dir teelebot \
     && mkdir /config && mkdir /plugins
 
-RUN apk add gcc musl-dev linux-headers liblz4-dev lz4-dev\
+RUN apk add  --no-cache gcc musl-dev linux-headers\
+    && apk add  --no-cache liblz4-dev lz4-dev
     && pip install lz4\
     && pip3 install -U python-115 
 
