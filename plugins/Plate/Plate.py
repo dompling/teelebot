@@ -12,6 +12,7 @@ import json, math, re, time, sqlite3, requests
 import teelebot
 from collections import deque
 from time import perf_counter
+from yarl import URL
 
 
 cookie_path = "Plate/115-cookie.txt"
@@ -272,7 +273,7 @@ def Plate(bot, message):
         return handle_common_actions(bot, message, client, db)
 
     elif text.startswith("/wp"):
-        if client.login_status():
+        if cookies:
             if super_admin == False and text.startswith("/wpadmin"):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif check_user_admin(bot, message, super_admin, is_admin) == False:
@@ -309,41 +310,47 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         return
 
     file_id = ""
-    file_size = -1
     file_name = ""
     if message.get("photo"):
         photo = max(message["photo"], key=lambda x: x["file_size"])
         file_id = photo["file_id"]
-        file_size = photo["file_size"]
         file_name = photo["file_unique_id"] + ".png"
     elif message.get("video"):
         file_id = message["video"]["file_id"]
-        file_size = message["video"]["file_size"]
         file_name = message["video"]["file_name"]
 
     if file_id:
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
+        chat_id = message["chat"]["id"]
+
         req = requests.get(url=file_dl_path)
         if type(req.content) == bytes:
             file_content = req.content
         else:
-            file_content = file_dl_path
+            file_content = URL(file_dl_path)
 
-        chat_id = message["chat"]["id"]
-        status = bot.sendMessage(chat_id=chat_id, text="💾上传中...", parse_mode="HTML")
-        bot.message_deletor(5, chat_id, status["message_id"])
+        status = bot.sendPhoto(
+            chat_id=chat_id,
+            caption="💾上传中...",
+            photo=logo,
+            parse_mode="HTML",
+            reply_to_message_id=message["message_id"],
+        )
+
+        def make_reporthook(total: None | int = None):
+            return make_report(bot, status, total)
 
         resp = client.upload_file(
             file=file_content,
             pid=int(user_default_path["content"]),
-            filesize=file_size,
-            partsize=5,
             filename=file_name,
+            close_file=True,
+            make_reporthook=make_reporthook,
         )
-        msg = f"上传成功"
-        if resp["error"]:
-            msg = resp["error"]
-        update_msg_text(bot, message, msg)
+        msg = f"✅上传成功"
+        if resp["statusmsg"]:
+            msg = resp["statusmsg"]
+        update_msg_text(bot, status, msg)
 
 
 def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
@@ -365,14 +372,13 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
 def handle_save_action(bot, message, client: P115Client, action: str, db: SqliteDB):
     reply_to_message = message.get("reply_to_message", message)
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
-    message_type = reply_to_message.get("message_type")
     share_type, url = macth_content(content)
     if share_type == "115_url":
         handle_save_share_url(bot, message, client, url, action)
     elif share_type == "magent_url":
         handle_magnet_url(bot, message, client, url, action)
-    elif message_type in ["video", "photo"]:
-        handle_save_file(bot, message, client, db)
+    elif "video" in reply_to_message.keys() or "photo" in reply_to_message.keys():
+        handle_save_file(bot, reply_to_message, client, db)
 
 
 def handle_callback_query(bot, message, callback_query_data: str):
@@ -500,7 +506,7 @@ def send_plugin_info(bot, chat_id, message_id):
     """发送插件功能信息"""
     msg = (
         "<b>115网盘 插件功能</b>\n\n"
-        + "<b>/wpsave</b> - 引用链接保存到网盘\n"
+        + "<b>/wpsave</b> - 内容保存到网盘\n"
         + "<b>/wplogout</b> - 退出重新登录\n"
         + "<b>/wpadmin</b> - 设置管理员\n"
         + "<b>/wpconfig</b> - 网盘配置"
@@ -961,7 +967,7 @@ def macth_content(content):
     return False, content
 
 
-def make_report(total: None | int = None):
+def make_report(bot, message, total: None | int = None):
     dq: deque[tuple[int, float]] = deque(maxlen=64)
     push = dq.append
     read_num = 0
@@ -972,21 +978,25 @@ def make_report(total: None | int = None):
         speed = (read_num - dq[0][0]) / 1024 / 1024 / (cur_t - dq[0][1])
         if total:
             percentage = read_num / total * 100
-            msg = (
-                f"\r\x1b[K{read_num} / {total} | {speed:.2f} MB/s | {percentage:.2f} %"
-            )
+            up_num = read_num / (1024 * 1024)
+            total_num = total / (1024 * 1024)
+            msg = f"\r\x1b[K{up_num:.2f}MB / {total_num:.2f}MB | {speed:.2f} MB/s | {percentage:.2f} %"
             print(msg, end="", flush=True)
-            bot.editMessageText(
+            time.sleep(1)
+            msg = f"{up_num:.2f}MB / {total_num:.2f}MB | {speed:.2f} MB/s | {percentage:.2f} %"
+            bot.editMessageCaption(
                 chat_id=message["chat"]["id"],
+                caption=msg,
                 message_id=message["message_id"],
-                text=msg,
             )
         else:
-            msg = f"\r\x1b[K{read_num} | {speed:.2f} MB/s"
+            msg = f"\r\x1b[K{(read_num / (1024 * 1024)):.2f}MB | {speed:.2f} MB/s"
             print(msg, end="", flush=True)
-            bot.editMessageText(
+            time.sleep(1)
+            msg = f"{(read_num / (1024 * 1024)):.2f}MB | {speed:.2f} MB/s"
+            bot.editMessageCaption(
                 chat_id=message["chat"]["id"],
+                caption=msg,
                 message_id=message["message_id"],
-                text=msg,
             )
         push((read_num, cur_t))
