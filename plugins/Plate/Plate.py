@@ -587,7 +587,7 @@ def handle_common_actions(
         actions = callback_query_data.split("|")
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
     if len(actions) != 4:
-        actions = [actions[0], "c", 0, actions[1]]
+        actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
         elif actions[0] == "/wpcdel":
@@ -632,6 +632,7 @@ def handle_common_actions(
 
             elif command[actions[0]] == command["/wpcset"]:
                 handle_set_default_path(bot, message, db, actions[2])
+
             elif command[actions[0]] == command["/wpdel"]:
                 handle_del(bot, message, client, db, actions)
 
@@ -722,7 +723,10 @@ def handle_sendMessage(
             parse_mode="HTML",
             reply_to_message_id=message_id,
             reply_markup=get_page_btn(
-                actions, client=client, current=page, has_file=has_file
+                actions,
+                client=client,
+                current=page,
+                has_file=has_file,
             ),
         )
     else:
@@ -731,7 +735,10 @@ def handle_sendMessage(
             caption=msg,
             message_id=message_id,
             reply_markup=get_page_btn(
-                actions, client=client, current=page, has_file=has_file
+                actions,
+                client=client,
+                current=page,
+                has_file=has_file,
             ),
         )
     if status:
@@ -868,7 +875,7 @@ def update_msg_text(
             parse_mode="HTML",
             reply_to_message_id=message_id,
         )
-    if del_msg:
+    if not del_msg:
         return status
     bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
@@ -949,7 +956,7 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
         },
         {
             "text": f"❤️{command_text[c]}",
-            "callback_data": f"{c}|s|{cid}|{userid}",
+            "callback_data": f"{c}|e|{cid}|{userid}",
         },
     ]
 
