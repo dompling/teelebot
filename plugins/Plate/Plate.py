@@ -604,6 +604,7 @@ def handle_common_actions(
         if "p=" in actions[1]:
             """目录翻页"""
             page = int(actions[1].split("=")[1])
+            client.fs.chdir(int(actions[2]))
             handle_sendMessage(bot, message, client, actions, True, page)
 
         if actions[1] == "d":
@@ -741,7 +742,7 @@ def handle_sendMessage(
                 has_file=has_file,
             ),
         )
-    if status:
+    if status and status["message_id"]:
         bot.message_deletor(90, message["chat"]["id"], status["message_id"])
     else:
         time.sleep(1)  # 睡眠1秒
