@@ -348,7 +348,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
             make_reporthook=make_reporthook,
         )
         msg = f"✅上传成功"
-        if resp["statusmsg"]:
+        if resp.get("statusmsg"):
             msg = resp["statusmsg"]
         update_msg_text(bot, status, msg)
 
