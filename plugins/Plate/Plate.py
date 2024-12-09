@@ -213,7 +213,7 @@ class SqliteDB(object):
 
 
 def Plate(bot, message):
-    gap = 15
+    gap = 30
     message_id = message["message_id"]
     text = message.get("text", "")
     chat_id = message["chat"]["id"]
@@ -265,7 +265,7 @@ def Plate(bot, message):
         is_admin = int(super_admin["user_id"]) == user_id
 
     if text[0:3] == prefix and message_type != "callback_query_data":
-        bot.message_deletor(5, message["chat"]["id"], message_id)
+        bot.message_deletor(gap, message["chat"]["id"], message_id)
 
     if message_type == "callback_query_data":
         callback_query_data = message["callback_query_data"]
@@ -573,7 +573,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
             ]
         },
     )
-    bot.message_deletor(90, message["chat"]["id"], status["message_id"])
+    bot.message_deletor(90, message_id, status["message_id"])
 
 
 def handle_common_actions(
@@ -606,7 +606,9 @@ def handle_common_actions(
             result = db.find(user_id=click_user_id, type=data_db_type["path"])
             if result:
                 client.fs.chdir(int(result["content"]))
-            handle_sendMessage(bot, message, client, actions, has_file=True)
+                actions = [actions[0], "c", result["content"], actions[3]]
+
+            handle_sendMessage(bot, message, client, actions)
     else:
         if "p=" in actions[1]:
             """目录翻页"""
@@ -625,10 +627,11 @@ def handle_common_actions(
 
         elif actions[1] == ".":
             """返回上级目录"""
-            current_path = client.fs.get_path(actions[2])
+            client.fs.chdir(int(actions[2]))
+            current_path = client.fs.getcwd()
             current_path = current_path.split("/")
             pre_path = "/".join(current_path[0:-1])
-            client.fs.chdir(pre_path)
+            client.fs.chdir(pre_path if pre_path else 0)
             cid = client.fs.getcid()
             actions[2] = cid
             handle_sendMessage(bot, message, client, actions)
@@ -707,7 +710,7 @@ def handle_logout(bot, message, client: P115Client):
 
 # 解析方式
 def handle_sendMessage(
-    bot, message, client: P115Client, actions=[], is_edit=True, page=0, has_file=False
+    bot, message, client: P115Client, actions=[], is_edit=True, page=0
 ):
     """
     消息固定为:
@@ -734,7 +737,6 @@ def handle_sendMessage(
                 actions,
                 client=client,
                 current=page,
-                has_file=has_file,
             ),
         )
     else:
@@ -746,14 +748,10 @@ def handle_sendMessage(
                 actions,
                 client=client,
                 current=page,
-                has_file=has_file,
             ),
         )
-    if status and status.get("message_id"):
-        bot.message_deletor(90, message["chat"]["id"], status["message_id"])
-    else:
-        time.sleep(1)  # 睡眠1秒
-        handle_sendMessage(bot, message, client, actions, is_edit, page)
+    
+    bot.message_deletor(90, message_id, status["message_id"])
 
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
@@ -906,12 +904,21 @@ def save_cookie(path, cookies):
         file.write(cookies)
 
 
-def get_folder(client: P115Client, has_file: bool = False):
+def get_folder(client: P115Client, actions):
     fs = client.fs
     directory_list = fs.listdir_attr()
-    if has_file:
-        return directory_list
-    return [item for item in directory_list if item.is_directory]
+
+    unique_paths = set()
+    deduplicated_data = []
+
+    for item in directory_list:
+        if item["path"] not in unique_paths:
+            unique_paths.add(item["path"])
+            deduplicated_data.append(item)
+
+    if actions[0] in ["/wpdel"]:
+        return deduplicated_data
+    return [item for item in deduplicated_data if item.is_directory]
 
 
 def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
@@ -931,6 +938,7 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     c = actions[0]
     cid = actions[2]
     userid = actions[3]
+
     # 创建当前页面的按钮
     buttons = [
         {
@@ -981,8 +989,8 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     )
 
 
-def get_page_btn(actions, client: P115Client, current, has_file=False):
-    folder = get_folder(client, has_file)
+def get_page_btn(actions, client: P115Client, current):
+    folder = get_folder(client, actions)
     total_pages = math.ceil(len(folder) / ITEMS_PER_PAGE)
     inlineKeyboard = generate_pagination_keyboard(actions, folder, current, total_pages)
     reply_markup = {"inline_keyboard": inlineKeyboard}
