@@ -591,28 +591,28 @@ def handle_common_actions(
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
-            
+
         elif actions[0] == "/wpcdel":
             db.delete(click_user_id, data_db_type["path"])
             update_msg_text(bot, message, "✅删除网盘默认目录成功")
-            
+
         elif actions[0] == "/wplogin":
             handle_qrcode_login(bot=bot, message=message, client=client)
-            
+
         elif actions[0] == "/wprec":
             handle_clear_recycle(bot, message, client, db)
-            
+
         elif actions[0] == "/wpdel":
             result = db.find(user_id=click_user_id, type=data_db_type["path"])
             if result:
                 client.fs.chdir(int(result["content"]))
-            handle_sendMessage(bot, message, client, actions, True, 0, True)
+            handle_sendMessage(bot, message, client, actions, has_file=True)
     else:
         if "p=" in actions[1]:
             """目录翻页"""
             page = int(actions[1].split("=")[1])
             client.fs.chdir(int(actions[2]))
-            handle_sendMessage(bot, message, client, actions, True, page)
+            handle_sendMessage(bot, message, client, actions, page=page)
 
         if actions[1] == "d":
             """取消目录消息"""
@@ -749,7 +749,7 @@ def handle_sendMessage(
                 has_file=has_file,
             ),
         )
-    if status and status["message_id"]:
+    if status and status.get("message_id"):
         bot.message_deletor(90, message["chat"]["id"], status["message_id"])
     else:
         time.sleep(1)  # 睡眠1秒
