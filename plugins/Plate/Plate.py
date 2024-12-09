@@ -25,6 +25,7 @@ url_115_rex = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/([a-zA-Z0-9]+)(?:\?passwo
 
 command = {  # 命令注册
     "/wpsave": "save",
+    "/wpdel": "del",
     "/wpconfig": "config",
     "/wpcset": "cset",
     "/wpcdel": "cdel",
@@ -36,6 +37,7 @@ command = {  # 命令注册
 
 command_text = {  # 命令注册
     "/wpsave": "保存",
+    "/wpdel": "删除",
     "/wpconfig": "115网盘设置",
     "/wpcset": "默认到",
     "/wpcdel": "删除默认",
@@ -310,13 +312,16 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         return
 
     file_id = ""
+    file_size = -1
     file_name = ""
     if message.get("photo"):
         photo = max(message["photo"], key=lambda x: x["file_size"])
         file_id = photo["file_id"]
+        file_size = photo["file_size"]
         file_name = photo["file_unique_id"] + ".png"
     elif message.get("video"):
         file_id = message["video"]["file_id"]
+        file_size = message["video"]["file_size"]
         file_name = message["video"]["file_name"]
 
     if file_id:
@@ -361,7 +366,7 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
             is_edit=False,
         )
     else:
-        actions = ["/wpsave", "s", user_default_path["content"], user_id]
+        actions = ["/wpsave", "e", user_default_path["content"], user_id]
         handle_common_actions(bot, message, client, db, actions)
 
 
@@ -559,6 +564,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                     {"text": "删除默认目录", "callback_data": f"/wpcdel|{user_id}"},
                 ],
                 [
+                    {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
                     {"text": "清空回收站", "callback_data": f"/wprec|{user_id}"},
                 ],
                 [
@@ -579,10 +585,10 @@ def handle_common_actions(
     else:
         callback_query_data = message.get("callback_query_data")
         actions = callback_query_data.split("|")
-    # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,s执行)，3：目录 id,4:用户 id
+    # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
     if len(actions) != 4:
+        actions = [actions[0], "c", 0, actions[1]]
         if actions[0] == "/wpcset":
-            actions = [actions[0], "c", 0, actions[1]]
             handle_sendMessage(bot, message, client, actions)
         elif actions[0] == "/wpcdel":
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
@@ -592,6 +598,8 @@ def handle_common_actions(
             handle_qrcode_login(bot=bot, message=message, client=client)
         elif actions[0] == "/wprec":
             handle_clear_recycle(bot, message, client, db)
+        elif actions[0] == "/wpdel":
+            handle_sendMessage(bot, message, client, actions, True, 0, True)
     else:
         if "p=" in actions[1]:
             """目录翻页"""
@@ -617,13 +625,24 @@ def handle_common_actions(
             actions[2] = cid
             handle_sendMessage(bot, message, client, actions)
 
-        elif actions[1] == "s":
+        elif actions[1] == "e":
             """执行当前目录功能"""
             if command[actions[0]] == command["/wpsave"]:
                 handle_save_action(bot, message, client, actions[2], db)
 
             elif command[actions[0]] == command["/wpcset"]:
                 handle_set_default_path(bot, message, db, actions[2])
+            elif command[actions[0]] == command["/wpdel"]:
+                handle_del(bot, message, client, db, actions)
+
+
+def handle_del(bot, message, client: P115Client, db, actions):
+    msg = "✅删除成功"
+    resp = client.fs_delete({"fid": [actions[2]]})
+    if resp.get("error"):
+        msg = f"🚫{resp.get('error')}"
+    update_msg_text(bot, message, msg, {"inline_keyboard": []}, False)
+    handle_common_actions(bot, message, client, db, [actions[0], "c", 0, actions[3]])
 
 
 def handle_clear_recycle(bot, message, client: P115Client, db: SqliteDB):
@@ -679,7 +698,7 @@ def handle_logout(bot, message, client: P115Client):
 
 # 解析方式
 def handle_sendMessage(
-    bot, message, client: P115Client, actions=[], is_edit=True, page=0
+    bot, message, client: P115Client, actions=[], is_edit=True, page=0, has_file=False
 ):
     """
     消息固定为:
@@ -702,14 +721,18 @@ def handle_sendMessage(
             photo=logo,
             parse_mode="HTML",
             reply_to_message_id=message_id,
-            reply_markup=get_page_btn(actions, client=client, current=page),
+            reply_markup=get_page_btn(
+                actions, client=client, current=page, has_file=has_file
+            ),
         )
     else:
         status = bot.editMessageCaption(
             chat_id=chat_id,
             caption=msg,
             message_id=message_id,
-            reply_markup=get_page_btn(actions, client=client, current=page),
+            reply_markup=get_page_btn(
+                actions, client=client, current=page, has_file=has_file
+            ),
         )
     if status:
         bot.message_deletor(90, message["chat"]["id"], status["message_id"])
@@ -826,7 +849,9 @@ def handle_qrcode_login(bot, message, client: P115Client):
     return resp
 
 
-def update_msg_text(bot, message, text, reply_markup={"inline_keyboard": []}):
+def update_msg_text(
+    bot, message, text, reply_markup={"inline_keyboard": []}, del_msg=True
+):
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
     status = bot.editMessageCaption(
@@ -843,6 +868,8 @@ def update_msg_text(bot, message, text, reply_markup={"inline_keyboard": []}):
             parse_mode="HTML",
             reply_to_message_id=message_id,
         )
+    if del_msg:
+        return status
     bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
 
@@ -864,9 +891,11 @@ def save_cookie(path, cookies):
         file.write(cookies)
 
 
-def get_folder(client: P115Client):
+def get_folder(client: P115Client, has_file: bool = False):
     fs = client.fs
     directory_list = fs.listdir_attr()
+    if has_file:
+        return directory_list
     return [item for item in directory_list if item.is_directory]
 
 
@@ -887,12 +916,11 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     c = actions[0]
     cid = actions[2]
     userid = actions[3]
-
     # 创建当前页面的按钮
     buttons = [
         {
-            "text": "📂" + d["name"],
-            "callback_data": f"{c}|c|{d['id']}|{userid}",
+            "text": f"🗂️{d['name']}" if d["is_dir"] else f"📒{d['name']}",
+            "callback_data": f"{c}|{('c' if d['is_dir'] else 'e')}|{d['id']}|{userid}",
         }
         for i, d in enumerate(directories[start:end], start=start)
     ]
@@ -938,8 +966,8 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     )
 
 
-def get_page_btn(actions, client: P115Client, current):
-    folder = get_folder(client)
+def get_page_btn(actions, client: P115Client, current, has_file=False):
+    folder = get_folder(client, has_file)
     total_pages = math.ceil(len(folder) / ITEMS_PER_PAGE)
     inlineKeyboard = generate_pagination_keyboard(actions, folder, current, total_pages)
     reply_markup = {"inline_keyboard": inlineKeyboard}
