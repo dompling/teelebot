@@ -545,7 +545,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
         device_names = ", ".join([device["name"] for device in device_list])
         msg += f"\n<b>⏲️网盘容量：{use_info}</b>"
         msg += f"\n<b>📟已登设备：{device_names}</b>"
-
+    status = bot.sendChatAction(chat_id=chat_id, action="typing")
     status = bot.sendPhoto(
         chat_id=chat_id,
         caption=msg,
