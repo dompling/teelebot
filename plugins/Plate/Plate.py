@@ -264,7 +264,7 @@ def Plate(bot, message):
     if is_admin == False and super_admin:
         is_admin = int(super_admin["user_id"]) == user_id
 
-    if text[0:3] == prefix:
+    if text[0:3] == prefix and message_type != "callback_query_data":
         bot.message_deletor(5, message["chat"]["id"], message_id)
 
     if message_type == "callback_query_data":
