@@ -505,7 +505,7 @@ def send_plugin_info(bot, chat_id, message_id):
         + "<b>/wpsave</b> - 内容保存到网盘\n"
         + "<b>/wplogout</b> - 退出重新登录\n"
         + "<b>/wpadmin</b> - 设置管理员\n"
-        + "<b>/wpconfig</b> - 网盘配置"
+        + "<b>/wpconfig</b> - 网盘配置\n"
         + "<b>/wprecp</b> - 回收站密码（命令+空格+密码）"
     )
     status = bot.sendMessage(
