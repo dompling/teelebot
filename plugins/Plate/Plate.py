@@ -8,7 +8,7 @@ from p115 import (
 import sys, os
 import errno
 from builtins import setattr
-import json, math, re, time, sqlite3, requests
+import json, math, re, time, sqlite3
 import teelebot
 from collections import deque
 from time import perf_counter
@@ -323,11 +323,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
         chat_id = message["chat"]["id"]
 
-        req = requests.get(url=file_dl_path)
-        if type(req.content) == bytes:
-            file_content = req.content
-        else:
-            file_content = URL(file_dl_path)
+        file_content = URL(file_dl_path)
 
         status = bot.sendPhoto(
             chat_id=chat_id,
