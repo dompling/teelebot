@@ -794,7 +794,20 @@ def handle_sendMessage(
         + current_path
         + "</b>"
     )
-    if is_edit == False:
+
+    status = bot.editMessageCaption(
+            chat_id=chat_id,
+            caption=msg,
+            message_id=message_id,
+            parse_mode="HTML",
+            reply_markup=get_page_btn(
+                actions,
+                client=client,
+                current=page,
+            ),
+        )
+    
+    if is_edit == False or status == False:
         message_id = reply_to_message.get("message_id")
         status = bot.sendPhoto(
             chat_id=chat_id,
@@ -808,20 +821,12 @@ def handle_sendMessage(
                 current=page,
             ),
         )
-    else:
-        status = bot.editMessageCaption(
-            chat_id=chat_id,
-            caption=msg,
-            message_id=message_id,
-            parse_mode="HTML",
-            reply_markup=get_page_btn(
-                actions,
-                client=client,
-                current=page,
-            ),
-        )
 
-    bot.message_deletor(90, message_id, status["message_id"])
+    if status != False:    
+        bot.message_deletor(90, message_id, status["message_id"])
+    else:
+        time.sleep(3)
+        return handle_sendMessage(bot,message,client,actions,is_edit,page)    
 
 
 def send_type_msg(bot, message, msg, mime_type, file, file_name):
@@ -960,8 +965,20 @@ def update_msg_text(
 ):
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
+    reply_to_message = message.get("reply_to_message", message)
     status = False
-    if is_new:
+        
+    if status == False:
+        status = bot.editMessageCaption(
+            chat_id=chat_id,
+            caption=text,
+            parse_mode="HTML",
+            message_id=message_id,
+            reply_markup=reply_markup,
+        )
+
+    if is_new or status == False:
+        message_id = reply_to_message.get("message_id")
         status = bot.sendPhoto(
             chat_id=chat_id,
             caption=text,
@@ -971,14 +988,6 @@ def update_msg_text(
             reply_markup=reply_markup,
         )
 
-    if status == False:
-        status = bot.editMessageCaption(
-            chat_id=chat_id,
-            caption=text,
-            parse_mode="HTML",
-            message_id=message_id,
-            reply_markup=reply_markup,
-        )
     bot.message_deletor(deletor, message["chat"]["id"], status["message_id"])
 
 
