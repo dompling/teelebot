@@ -11,4 +11,4 @@ dist/
 *.egg-info/
 TODO.md
 build.sh
-*cookie.txt
+*cookie*.txt
