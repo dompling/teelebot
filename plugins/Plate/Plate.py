@@ -794,20 +794,21 @@ def handle_sendMessage(
         + current_path
         + "</b>"
     )
-
-    status = bot.editMessageCaption(
-            chat_id=chat_id,
-            caption=msg,
-            message_id=message_id,
-            parse_mode="HTML",
-            reply_markup=get_page_btn(
+    status =False
+    reply_markup = get_page_btn(
                 actions,
                 client=client,
                 current=page,
-            ),
-        )
-    
-    if is_edit == False or status == False:
+            )
+    status = bot.editMessageCaption(
+        chat_id=chat_id,
+        caption=msg,
+        message_id=message_id,
+        parse_mode="HTML",
+        reply_markup=reply_markup,
+    )
+
+    if is_edit == False:
         message_id = reply_to_message.get("message_id")
         status = bot.sendPhoto(
             chat_id=chat_id,
@@ -815,18 +816,13 @@ def handle_sendMessage(
             photo=logo,
             parse_mode="HTML",
             reply_to_message_id=message_id,
-            reply_markup=get_page_btn(
-                actions,
-                client=client,
-                current=page,
-            ),
+            reply_markup=reply_markup,
         )
-
-    if status != False:    
+    time.sleep(5)
+    if type(status) == object:    
         bot.message_deletor(90, message_id, status["message_id"])
-    else:
-        time.sleep(3)
-        return handle_sendMessage(bot,message,client,actions,is_edit,page)    
+        
+            
 
 
 def send_type_msg(bot, message, msg, mime_type, file, file_name):
@@ -987,8 +983,11 @@ def update_msg_text(
             reply_to_message_id=message_id,
             reply_markup=reply_markup,
         )
-
-    bot.message_deletor(deletor, message["chat"]["id"], status["message_id"])
+    
+    time.sleep(5)
+    if type(status) == object:    
+        bot.message_deletor(deletor, message_id, status["message_id"])
+        
 
 
 def get_cookie(path):
@@ -1092,11 +1091,9 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
         if exec == "e":
             file_items.append([btn])
         else:
-            folder_items.append(btn)
-
-    grouped_items = [folder_items[i : i + 3] for i in range(0, len(folder_items), 3)]
-
-    menu = grouped_items + file_items
+            folder_items.append([btn])
+            
+    menu = folder_items + file_items
 
     if header_buttons:
         menu.insert(0, header_buttons)
