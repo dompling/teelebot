@@ -25,6 +25,7 @@ url_115_rex = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/([a-zA-Z0-9]+)(?:\?passwo
 
 command = {  # 命令注册
     "/wpsave": "save",
+    "/wpdown": "down",
     "/wpdel": "del",
     "/wpconfig": "config",
     "/wpcset": "cset",
@@ -37,6 +38,7 @@ command = {  # 命令注册
 
 command_text = {  # 命令注册
     "/wpsave": "保存",
+    "/wpdown": "下载",
     "/wpdel": "删除",
     "/wpconfig": "115网盘设置",
     "/wpcset": "默认到",
@@ -565,7 +567,10 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                 ],
                 [
                     {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
-                    {"text": "清空回收站", "callback_data": f"/wprec|{user_id}"},
+                    {"text": "下载文件或目录", "callback_data": f"/wpdown|{user_id}"},
+                ],
+                [
+                    {"text": "🗑清空回收站", "callback_data": f"/wprec|{user_id}"},
                 ],
                 [
                     {"text": "取消", "callback_data": f"/wpconfig|d|0|{user_id}"},
@@ -603,7 +608,7 @@ def handle_common_actions(
         elif actions[0] == "/wprec":
             handle_clear_recycle(bot, message, client, db)
 
-        elif actions[0] == "/wpdel":
+        elif actions[0] in ["/wpdel", "/wpdown"]:
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
             result = db.find(user_id=click_user_id, type=data_db_type["path"])
             if result:
@@ -648,6 +653,43 @@ def handle_common_actions(
 
             elif command[actions[0]] == command["/wpdel"]:
                 handle_del(bot, message, client, db, actions)
+
+            elif command[actions[0]] == command["/wpdown"]:
+                handle_download_file(bot, message, client, actions)
+
+
+def handle_download_file(bot, message, client: P115Client, actions):
+    content_attr = client.fs.attr(int(actions[2]))
+    if content_attr["is_directory"] == False:
+        resp = client.download_url_app({"pickcode": content_attr["pick_code"]})
+        if resp["msg"]:
+            msg = "🚫" + resp["msg"]
+        else:
+            file_size = convert_size_auto(content_attr["size"])
+            url = resp["data"][actions[2]]["url"]["url"]
+            msg = (
+                "✅获取成功\n<b><a href='"
+                + url
+                + "'>"
+                + content_attr["name"]
+                + "</a></b>\n"
+                + "<b>文件大小："
+                + f"{file_size}"
+                + "</b>"
+            )
+        update_msg_text(
+            bot,
+            message,
+            msg,
+            is_new=True,
+            deletor=10 if not resp["msg"] else 5,
+        )
+    else:
+        bot.answerCallbackQuery(
+            callback_query_id=message["callback_query_id"],
+            text="🚫 不是一个文件，请重选择",
+            show_alert=True,
+        )
 
 
 def handle_del(bot, message, client: P115Client, db, actions):
@@ -726,7 +768,14 @@ def handle_sendMessage(
 
     current_path = client.fs.getcwd()
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
-    msg = "当前目录：" + current_path
+    msg = (
+        "当前操作：<b>"
+        + command_text[actions[0]]
+        + "</b>\n"
+        + "操作目录：<b>"
+        + current_path
+        + "</b>"
+    )
     if is_edit == False:
         message_id = reply_to_message.get("message_id")
         status = bot.sendPhoto(
@@ -742,10 +791,12 @@ def handle_sendMessage(
             ),
         )
     else:
+        print(message)
         status = bot.editMessageCaption(
             chat_id=chat_id,
             caption=msg,
             message_id=message_id,
+            parse_mode="HTML",
             reply_markup=get_page_btn(
                 actions,
                 client=client,
@@ -865,28 +916,35 @@ def handle_qrcode_login(bot, message, client: P115Client):
 
 
 def update_msg_text(
-    bot, message, text, reply_markup={"inline_keyboard": []}, del_msg=True
+    bot,
+    message,
+    text,
+    reply_markup={"inline_keyboard": []},
+    is_new=False,
+    deletor=5,
 ):
     chat_id = message["chat"]["id"]
     message_id = message["message_id"]
-    status = bot.editMessageCaption(
-        chat_id=chat_id,
-        caption=text,
-        message_id=message_id,
-        reply_markup=reply_markup,
-    )
-    if status == False:
+    status = False
+    if is_new:
         status = bot.sendPhoto(
             chat_id=chat_id,
             caption=text,
             photo=logo,
             parse_mode="HTML",
             reply_to_message_id=message_id,
+            reply_markup=reply_markup,
         )
-    if not del_msg:
-        return status
-    if status and type(status) == object:
-        bot.message_deletor(5, message["chat"]["id"], status["message_id"])
+
+    if status == False:
+        status = bot.editMessageCaption(
+            chat_id=chat_id,
+            caption=text,
+            parse_mode="HTML",
+            message_id=message_id,
+            reply_markup=reply_markup,
+        )
+    bot.message_deletor(deletor, message["chat"]["id"], status["message_id"])
 
 
 def get_cookie(path):
@@ -919,18 +977,9 @@ def get_folder(client: P115Client, actions):
             unique_paths.add(item["path"])
             deduplicated_data.append(item)
 
-    if actions[0] in ["/wpdel"]:
+    if actions[0] in ["/wpdel", "/wpdown"]:
         return deduplicated_data
     return [item for item in deduplicated_data if item.is_directory]
-
-
-def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
-    menu = [buttons[i : i + n_cols] for i in range(0, len(buttons), n_cols)]
-    if header_buttons:
-        menu.insert(0, header_buttons)
-    if footer_buttons:
-        menu.append(footer_buttons)
-    return menu
 
 
 def generate_pagination_keyboard(actions, directories, current_page, total_pages):
@@ -951,45 +1000,69 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
         for i, d in enumerate(directories[start:end], start=start)
     ]
 
-    footer_buttons = []
+    header_buttons = []
     # 创建分页按钮
     if current_page > 0:
-        footer_buttons.append(
+        header_buttons.append(
             {
-                "text": "上一页",
+                "text": "<<",
                 "callback_data": f"{c}|p={current_page-1}|{cid}|{userid}",
             }
         )
-    if current_page < total_pages - 1:
-        footer_buttons.append(
+
+    if total_pages != 1:
+        header_buttons.append(
             {
-                "text": "下一页",
+                "text": f"{start if start != 0 else 1}-{end}({current_page+1}/{total_pages})页",
+                "callback_data": f"{c}|t|0|{userid}",
+            }
+        )
+
+    if current_page < total_pages - 1:
+        header_buttons.append(
+            {
+                "text": ">>",
                 "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
             }
         )
 
-    header_buttons = [
+    footer_buttons = [
         {
-            "text": "🗑️取消",
+            "text": "取消",
             "callback_data": f"{c}|d|{cid}|{userid}",
-        },
-        {
-            "text": f"❤️{command_text[c]}",
-            "callback_data": f"{c}|e|{cid}|{userid}",
         },
     ]
 
-    if int(cid) != 0:
-        header_buttons.insert(
-            1, {"text": "🔙返回", "callback_data": f"{c}|.|{cid}|{userid}"}
+    if actions[0] not in ["/wpdown"]:
+        footer_buttons.append(
+            {
+                "text": f"{command_text[c]}",
+                "callback_data": f"{c}|e|{cid}|{userid}",
+            }
         )
 
-    return build_menu(
-        buttons,
-        n_cols=3,
-        header_buttons=header_buttons,
-        footer_buttons=footer_buttons,
-    )
+    file_items = []
+    folder_items = []
+    for btn in buttons:
+        exec = btn["callback_data"].split("|")[1]
+        if exec == "e":
+            file_items.append([btn])
+        else:
+            folder_items.append(btn)
+
+    grouped_items = [folder_items[i : i + 3] for i in range(0, len(folder_items), 3)]
+
+    menu = grouped_items + file_items
+
+    if header_buttons:
+        menu.insert(0, header_buttons)
+    if footer_buttons:
+        menu.append(footer_buttons)
+
+    if int(cid) != 0:
+        menu.insert(0, [{"text": "返回上级", "callback_data": f"{c}|.|{cid}|{userid}"}])
+
+    return menu
 
 
 def get_page_btn(actions, client: P115Client, current):
@@ -1050,3 +1123,17 @@ def make_report(bot, message, total: None | int = None):
                 message_id=message["message_id"],
             )
         push((read_num, cur_t))
+
+
+def convert_size_auto(size_bytes, precision=2):
+    # 定义单位和对应的转换因子
+    units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+
+    # 确定最合适的单位
+    for unit in units:
+        if size_bytes < 1024.0:
+            return f"{round(size_bytes, precision)} {unit}"
+        size_bytes /= 1024.0
+
+    # 如果文件大小超过了最大的单位
+    return f"{round(size_bytes, precision)} {units[-1]}"
