@@ -1,11 +1,13 @@
 version: "3.8"
 services:
   teelebot:
-    image: ghcr.io/plutobell/teelebot:latest
-    container_name: teelebot
+    image: teelebot
+    container_name: teelebot_cus
     restart: always
     volumes:
       - $PWD/config:/config
       - $PWD/plugins:/plugins
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # 增加这一行
     tty: true
     stdin_open: true
