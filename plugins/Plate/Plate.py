@@ -312,9 +312,9 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
     if user_default_path == False:
         return
-    print(message)
+    # print(message)
     file_id = ""
-    file_size = -1
+    # file_size = -1
     file_name = ""
     if message.get("photo"):
         photo = max(message["photo"], key=lambda x: x["file_size"])
@@ -323,11 +323,11 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         file_name = photo["file_unique_id"] + ".png"
     elif message.get("video"):
         file_id = message["video"]["file_id"]
-        file_size = message["video"]["file_size"]
+        # file_size = message["video"]["file_size"]
         file_name = message["video"]["file_name"]
     elif message.get("audio"):
         file_id = message["audio"]["file_id"]
-        file_size = message["video"]["file_size"]
+        # file_size = message["video"]["file_size"]
         file_name = message["video"]["file_name"]
     else:
         file_id = message["document"]["file_id"]
