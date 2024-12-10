@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   teelebot:
-    image: teelebot
+    image: teelebot_yy
     container_name: teelebot_cus
     restart: always
     volumes:
