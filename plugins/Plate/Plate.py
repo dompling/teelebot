@@ -8,7 +8,7 @@ from p115 import (
 import sys, os
 import errno
 from builtins import setattr
-import json, math, re, time, sqlite3
+import json, math, re, time, sqlite3, mimetypes
 import teelebot
 from collections import deque
 from time import perf_counter
@@ -312,7 +312,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
     if user_default_path == False:
         return
-
+    print(message)
     file_id = ""
     file_size = -1
     file_name = ""
@@ -329,6 +329,8 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
     if file_id:
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
         chat_id = message["chat"]["id"]
+        if file_dl_path == False:
+            return update_msg_text(bot, message, "🚫 Tg下载链接获取失败")
 
         file_content = URL(file_dl_path)
 
@@ -343,13 +345,14 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         def make_reporthook(total: None | int = None):
             return make_report(bot, status, total)
 
-        resp = client.upload_file(
+        resp = client.fs.upload(
             file=file_content,
             pid=int(user_default_path["content"]),
-            filename=file_name,
-            close_file=True,
-            make_reporthook=make_reporthook,
+            # filename=file_name,
+            # close_file=True,
+            # make_reporthook=make_reporthook,
         )
+        print(resp)
         msg = f"✅上传成功"
         if resp.get("statusmsg"):
             msg = resp["statusmsg"]
@@ -664,26 +667,31 @@ def handle_download_file(bot, message, client: P115Client, actions):
         resp = client.download_url_app({"pickcode": content_attr["pick_code"]})
         if resp["msg"]:
             msg = "🚫" + resp["msg"]
+            update_msg_text(bot, message, msg, is_new=True)
         else:
             file_size = convert_size_auto(content_attr["size"])
             url = resp["data"][actions[2]]["url"]["url"]
+            result = client.open(url=url, headers=resp["headers"])
+            result_content = result.read()
+            mime_type = mimetypes.guess_type(content_attr["name"])[0]
             msg = (
-                "✅获取成功\n<b><a href='"
-                + url
-                + "'>"
-                + content_attr["name"]
-                + "</a></b>\n"
-                + "<b>文件大小："
+                "✅获取成功\n文件大小："
                 + f"{file_size}"
-                + "</b>"
+                + "\n文件名称："
+                + content_attr["name"]
             )
-        update_msg_text(
-            bot,
-            message,
-            msg,
-            is_new=True,
-            deletor=10 if not resp["msg"] else 5,
-        )
+            bot.sendChatAction(
+                chat_id=message["chat"]["id"], action="文件下载中，等着吧"
+            )
+            send_type_msg(
+                bot=bot,
+                message=message,
+                msg=msg,
+                mime_type=mime_type,
+                file=result_content,
+                file_name=content_attr["name"],
+            )
+
     else:
         bot.answerCallbackQuery(
             callback_query_id=message["callback_query_id"],
@@ -697,7 +705,7 @@ def handle_del(bot, message, client: P115Client, db, actions):
     resp = client.fs_delete({"fid": [actions[2]]})
     if resp.get("error"):
         msg = f"🚫{resp.get('error')}"
-    update_msg_text(bot, message, msg, {"inline_keyboard": []}, False)
+    update_msg_text(bot, message, msg, deletor=90)
     handle_common_actions(bot, message, client, db, [actions[0], "c", 0, actions[3]])
 
 
@@ -805,6 +813,55 @@ def handle_sendMessage(
         )
 
     bot.message_deletor(90, message_id, status["message_id"])
+
+
+def send_type_msg(bot, message, msg, mime_type, file, file_name):
+    try:
+        if mime_type:
+            chat_id = message["chat"]["id"]
+            message_id = message["message_id"]
+            # 根据 MIME 类型发送文件
+            if mime_type.startswith("image/"):
+                bot.sendPhoto(
+                    chat_id=chat_id,
+                    photo=file,
+                    caption=msg,
+                    reply_to_message_id=message_id,
+                )
+            elif mime_type.startswith("video/"):
+                bot.sendVideo(
+                    video=file,
+                    chat_id=chat_id,
+                    reply_to_message_id=message_id,
+                    caption=msg,
+                )
+            elif mime_type.startswith("audio/"):
+                bot.sendAudio(
+                    chat_id=chat_id,
+                    audio=file,
+                    reply_to_message_id=message_id,
+                    caption=msg,
+                )
+            elif mime_type in [
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ]:
+                bot.sendDocument(
+                    chat_id=chat_id, document=file, filename=file_name, caption=msg
+                )
+            else:
+                # 如果类型不明确，发送为文档
+                bot.sendDocument(
+                    chat_id=chat_id, document=file, filename=file_name, caption=msg
+                )
+        else:
+            # 如果没有 MIME 类型，发送为普通文件
+            bot.sendDocument(
+                chat_id=chat_id, document=file, filename=file_name, caption=msg
+            )
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
