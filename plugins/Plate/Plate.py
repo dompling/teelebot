@@ -586,7 +586,7 @@ def handle_common_actions(
         callback_query_data = message.get("callback_query_data")
         actions = callback_query_data.split("|")
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
-    
+
     if len(actions) != 4:
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
@@ -752,7 +752,7 @@ def handle_sendMessage(
                 current=page,
             ),
         )
-    
+
     bot.message_deletor(90, message_id, status["message_id"])
 
 
@@ -885,7 +885,8 @@ def update_msg_text(
         )
     if not del_msg:
         return status
-    bot.message_deletor(5, message["chat"]["id"], status["message_id"])
+    if status and type(status) == object:
+        bot.message_deletor(5, message["chat"]["id"], status["message_id"])
 
 
 def get_cookie(path):
