@@ -799,7 +799,6 @@ def handle_sendMessage(
             ),
         )
     else:
-        print(message)
         status = bot.editMessageCaption(
             chat_id=chat_id,
             caption=msg,
