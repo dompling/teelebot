@@ -8,7 +8,7 @@ from p115 import (
 import sys, os
 import errno
 from builtins import setattr
-import json, math, re, time, sqlite3, mimetypes
+import json, math, re, time, sqlite3, requests
 import teelebot
 from collections import deque
 from time import perf_counter
@@ -325,14 +325,19 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         file_id = message["video"]["file_id"]
         file_size = message["video"]["file_size"]
         file_name = message["video"]["file_name"]
+    elif message.get("audio"):
+        file_id = message["audio"]["file_id"]
+        file_size = message["video"]["file_size"]
+        file_name = message["video"]["file_name"]
+    else:
+        file_id = message["document"]["file_id"]
+        file_name = message["document"]["file_name"]
 
     if file_id:
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
         chat_id = message["chat"]["id"]
         if file_dl_path == False:
             return update_msg_text(bot, message, "🚫 Tg下载链接获取失败")
-
-        file_content = URL(file_dl_path)
 
         status = bot.sendPhoto(
             chat_id=chat_id,
@@ -345,12 +350,11 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         def make_reporthook(total: None | int = None):
             return make_report(bot, status, total)
 
-        resp = client.fs.upload(
-            file=file_content,
+        resp = client.upload_file(
+            file=URL(file_dl_path),
             pid=int(user_default_path["content"]),
-            # filename=file_name,
-            # close_file=True,
-            # make_reporthook=make_reporthook,
+            filename=file_name,
+            make_reporthook=make_reporthook
         )
         print(resp)
         msg = f"✅上传成功"
@@ -379,11 +383,17 @@ def handle_save_action(bot, message, client: P115Client, action: str, db: Sqlite
     reply_to_message = message.get("reply_to_message", message)
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
     share_type, url = macth_content(content)
+    reply_to_message_keys = reply_to_message.keys()
     if share_type == "115_url":
         handle_save_share_url(bot, message, client, url, action)
     elif share_type == "magent_url":
         handle_magnet_url(bot, message, client, url, action)
-    elif "video" in reply_to_message.keys() or "photo" in reply_to_message.keys():
+    elif (
+        "video" in reply_to_message_keys
+        or "photo" in reply_to_message_keys
+        or "audio" in reply_to_message_keys
+        or "document" in reply_to_message_keys
+    ):
         handle_save_file(bot, reply_to_message, client, db)
 
 
@@ -570,7 +580,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                 ],
                 [
                     {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
-                    {"text": "下载文件或目录", "callback_data": f"/wpdown|{user_id}"},
+                    {"text": "下载文件", "callback_data": f"/wpdown|{user_id}"},
                 ],
                 [
                     {"text": "🗑清空回收站", "callback_data": f"/wprec|{user_id}"},
@@ -675,23 +685,21 @@ def handle_download_file(bot, message, client: P115Client, actions):
             url = resp["data"][actions[2]]["url"]["url"]
             result = client.open(url=url, headers=resp["headers"])
             result_content = result.read()
-            mime_type = mimetypes.guess_type(content_attr["name"])[0]
             msg = (
                 "✅获取成功\n文件大小："
                 + f"{file_size}"
                 + "\n文件名称："
                 + content_attr["name"]
             )
-            bot.sendChatAction(
-                chat_id=message["chat"]["id"], action="文件下载中，等着吧"
-            )
-            send_type_msg(
-                bot=bot,
-                message=message,
-                msg=msg,
-                mime_type=mime_type,
-                file=result_content,
-                file_name=content_attr["name"],
+            bot.sendChatAction(chat_id=message["chat"]["id"], action="typing")
+            bot.sendDocument(
+                chat_id=message["chat"]["id"],
+                document=(
+                    content_attr["name"],
+                    result_content,
+                    "application/octet-stream",
+                ),
+                caption=msg,
             )
 
     else:
@@ -821,45 +829,14 @@ def send_type_msg(bot, message, msg, mime_type, file, file_name):
         if mime_type:
             chat_id = message["chat"]["id"]
             message_id = message["message_id"]
-            # 根据 MIME 类型发送文件
-            if mime_type.startswith("image/"):
-                bot.sendPhoto(
-                    chat_id=chat_id,
-                    photo=file,
-                    caption=msg,
-                    reply_to_message_id=message_id,
-                )
-            elif mime_type.startswith("video/"):
-                bot.sendVideo(
-                    video=file,
-                    chat_id=chat_id,
-                    reply_to_message_id=message_id,
-                    caption=msg,
-                )
-            elif mime_type.startswith("audio/"):
-                bot.sendAudio(
-                    chat_id=chat_id,
-                    audio=file,
-                    reply_to_message_id=message_id,
-                    caption=msg,
-                )
-            elif mime_type in [
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ]:
-                bot.sendDocument(
-                    chat_id=chat_id, document=file, filename=file_name, caption=msg
-                )
-            else:
-                # 如果类型不明确，发送为文档
-                bot.sendDocument(
-                    chat_id=chat_id, document=file, filename=file_name, caption=msg
-                )
+
         else:
             # 如果没有 MIME 类型，发送为普通文件
             bot.sendDocument(
-                chat_id=chat_id, document=file, filename=file_name, caption=msg
+                chat_id=chat_id,
+                document=file,
+                filename=file_name,
+                caption=msg,
             )
     except Exception as e:
         print(f"An error occurred: {e}")
