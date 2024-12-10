@@ -596,6 +596,7 @@ def handle_common_actions(
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
 
     if len(actions) != 4:
+        ## wpconfig 菜单命令
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
@@ -620,6 +621,7 @@ def handle_common_actions(
 
             handle_sendMessage(bot, message, client, actions)
     else:
+        ## 目录功能命令
         if "p=" in actions[1]:
             """目录翻页"""
             page = int(actions[1].split("=")[1])
