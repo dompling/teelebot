@@ -586,13 +586,14 @@ def handle_common_actions(
         callback_query_data = message.get("callback_query_data")
         actions = callback_query_data.split("|")
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
-    click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
+    
     if len(actions) != 4:
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
 
         elif actions[0] == "/wpcdel":
+            click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
             db.delete(click_user_id, data_db_type["path"])
             update_msg_text(bot, message, "✅删除网盘默认目录成功")
 
@@ -603,6 +604,7 @@ def handle_common_actions(
             handle_clear_recycle(bot, message, client, db)
 
         elif actions[0] == "/wpdel":
+            click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
             result = db.find(user_id=click_user_id, type=data_db_type["path"])
             if result:
                 client.fs.chdir(int(result["content"]))
