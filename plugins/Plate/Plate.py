@@ -1138,7 +1138,7 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     header_buttons = create_pagination(current_page, total_pages, actions)
 
     if header_buttons:
-        menu.insert(0, header_buttons)
+        menu.append(header_buttons)
     if footer_buttons:
         menu.append(footer_buttons)
 
