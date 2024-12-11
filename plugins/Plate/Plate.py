@@ -1038,7 +1038,7 @@ def create_pagination(current_page, total_pages, actions):
     userid = actions[3]
     header_buttons = []
 
-    for i in range(max(0, current_page - 2), min(total_pages, current_page + 3)):
+    for i in range(max(0, current_page - 4), min(total_pages, current_page + 5)):
         header_buttons.append(
             {
                 "text": f"{'📍' if i == current_page else i+1}",
