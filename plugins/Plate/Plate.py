@@ -354,7 +354,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
             file=URL(file_dl_path),
             pid=int(user_default_path["content"]),
             filename=file_name,
-            make_reporthook=make_reporthook
+            make_reporthook=make_reporthook,
         )
         print(resp)
         msg = f"✅上传成功"
@@ -788,18 +788,30 @@ def handle_sendMessage(
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
     msg = (
         "当前操作：<b>"
+        + actions[0]
+        + "-"
         + command_text[actions[0]]
         + "</b>\n"
         + "操作目录：<b>"
         + current_path
-        + "</b>"
+        + "</b>\n"
     )
-    status =False
-    reply_markup = get_page_btn(
-                actions,
-                client=client,
-                current=page,
-            )
+    status = False
+    reply_markup, pagination = get_page_btn(actions, client=client, current=page)
+
+    msg += (
+        "当前内容：<b>第 "
+        + str(pagination["start"])
+        + "-"
+        + str(pagination["end"])
+        + "条</b>\n"
+        + "当前页码：<b>第 "
+        + str(pagination["page"])
+        + "/"
+        + str(pagination["total_pages"])
+        + "页</b>"
+    )
+
     status = bot.editMessageCaption(
         chat_id=chat_id,
         caption=msg,
@@ -818,11 +830,6 @@ def handle_sendMessage(
             reply_to_message_id=message_id,
             reply_markup=reply_markup,
         )
-    time.sleep(5)
-    if type(status) == object:    
-        bot.message_deletor(90, message_id, status["message_id"])
-        
-            
 
 
 def send_type_msg(bot, message, msg, mime_type, file, file_name):
@@ -963,7 +970,7 @@ def update_msg_text(
     message_id = message["message_id"]
     reply_to_message = message.get("reply_to_message", message)
     status = False
-        
+
     if status == False:
         status = bot.editMessageCaption(
             chat_id=chat_id,
@@ -983,11 +990,8 @@ def update_msg_text(
             reply_to_message_id=message_id,
             reply_markup=reply_markup,
         )
-    
-    time.sleep(5)
-    if type(status) == object:    
-        bot.message_deletor(deletor, message_id, status["message_id"])
-        
+    if type(status) == dict:
+        bot.message_deletor(deletor, chat_id, status["message_id"])
 
 
 def get_cookie(path):
@@ -1025,6 +1029,68 @@ def get_folder(client: P115Client, actions):
     return [item for item in deduplicated_data if item.is_directory]
 
 
+def create_pagination(current_page, total_pages, actions):
+    if total_pages == 1:
+        return False
+
+    c = actions[0]
+    cid = actions[2]
+    userid = actions[3]
+    header_buttons = []
+
+    for i in range(max(0, current_page - 2), min(total_pages, current_page + 3)):
+        header_buttons.append(
+            {
+                "text": f"{'📍' if i == current_page else i+1}",
+                "callback_data": f"{c}|p={i}|{cid}|{userid}",
+            }
+        )
+        
+        
+    if current_page > 0:
+        header_buttons.insert(
+            0,
+            {
+                "text": "<",
+                "callback_data": f"{c}|p={current_page-1}|{cid}|{userid}",
+            },
+        )
+
+    if current_page < total_pages - 1:
+        header_buttons.append(
+            {
+                "text": ">",
+                "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
+            }
+        )
+
+    
+    page_action = header_buttons[0]['callback_data'].split("|")[1]
+    _, page = page_action.split("=")
+    
+    if page != "0":
+        header_buttons.insert(
+            0,
+            {
+                "text": "<<",
+                "callback_data": f"{c}|p=0|{cid}|{userid}",
+            },
+        )
+        
+    page_action = header_buttons[-1]['callback_data'].split("|")[1]
+    _, page = page_action.split("=")
+    
+    if page != str(total_pages - 1):
+        header_buttons.append(
+            {
+                "text": f">>",
+                "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
+            },
+        )
+
+    return header_buttons
+
+
 def generate_pagination_keyboard(actions, directories, current_page, total_pages):
     # 计算当前页面的开始和结束索引
     start = current_page * ITEMS_PER_PAGE
@@ -1042,32 +1108,6 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
         }
         for i, d in enumerate(directories[start:end], start=start)
     ]
-
-    header_buttons = []
-    # 创建分页按钮
-    if current_page > 0:
-        header_buttons.append(
-            {
-                "text": "<<",
-                "callback_data": f"{c}|p={current_page-1}|{cid}|{userid}",
-            }
-        )
-
-    if total_pages != 1:
-        header_buttons.append(
-            {
-                "text": f"{start if start != 0 else 1}-{end}({current_page+1}/{total_pages})页",
-                "callback_data": f"{c}|t|0|{userid}",
-            }
-        )
-
-    if current_page < total_pages - 1:
-        header_buttons.append(
-            {
-                "text": ">>",
-                "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
-            }
-        )
 
     footer_buttons = [
         {
@@ -1092,8 +1132,10 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
             file_items.append([btn])
         else:
             folder_items.append([btn])
-            
+
     menu = folder_items + file_items
+
+    header_buttons = create_pagination(current_page, total_pages, actions)
 
     if header_buttons:
         menu.insert(0, header_buttons)
@@ -1103,15 +1145,22 @@ def generate_pagination_keyboard(actions, directories, current_page, total_pages
     if int(cid) != 0:
         menu.insert(0, [{"text": "返回上级", "callback_data": f"{c}|.|{cid}|{userid}"}])
 
-    return menu
+    return menu, {
+        "page": current_page + 1,
+        "total_pages": total_pages,
+        "start": start if start != 0 else 1,
+        "end": end,
+    }
 
 
 def get_page_btn(actions, client: P115Client, current):
     folder = get_folder(client, actions)
     total_pages = math.ceil(len(folder) / ITEMS_PER_PAGE)
-    inlineKeyboard = generate_pagination_keyboard(actions, folder, current, total_pages)
+    inlineKeyboard, pagination = generate_pagination_keyboard(
+        actions, folder, current, total_pages
+    )
     reply_markup = {"inline_keyboard": inlineKeyboard}
-    return reply_markup
+    return reply_markup, pagination
 
 
 # 解析链接
