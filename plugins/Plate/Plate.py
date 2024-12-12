@@ -1124,8 +1124,7 @@ def create_pagination(current_page, total_pages, actions):
 
     last_action = page_buttons[-1]["callback_data"].split("|")[1]
     _, last_page = last_action.split("=")
-    print(last_page)
-    print(last_page != str(total_pages - 1))
+
     if last_page != str(total_pages - 1):
         header_buttons.append(
             {
@@ -1133,7 +1132,7 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
             },
         )
-    print(header_buttons)
+    
     return header_buttons
 
 
