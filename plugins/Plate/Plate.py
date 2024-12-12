@@ -822,15 +822,19 @@ def handle_sendMessage(
         + current_path
         + "</b>\n"
     )
-    status = False
-    reply_markup, pagination = get_page_btn(actions, client=client, current=page)
+
+    reply_markup, pagination, totals = get_page_btn(
+        actions, client=client, current=page
+    )
 
     msg += (
         "当前内容：<b>第 "
         + str(pagination["start"])
         + "-"
         + str(pagination["end"])
-        + "条</b>\n"
+        + "条 共 "
+        + str(totals)
+        + " 条</b>\n"
         + "当前页码：<b>第 "
         + str(pagination["page"])
         + "/"
@@ -1187,7 +1191,7 @@ def get_page_btn(actions, client: P115Client, current):
         actions, folder, current, total_pages
     )
     reply_markup = {"inline_keyboard": inlineKeyboard}
-    return reply_markup, pagination
+    return reply_markup, pagination, len(folder)
 
 
 # 解析链接
