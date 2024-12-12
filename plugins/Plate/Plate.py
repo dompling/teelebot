@@ -742,7 +742,11 @@ def handle_del(bot, message, client: P115Client, db, actions):
     if resp.get("error"):
         msg = f"🚫{resp.get('error')}"
     update_msg_text(bot, message, msg, deletor=90)
-    handle_common_actions(bot, message, client, db, [actions[0], "c", 0, actions[3]])
+    result = db.find(user_id=actions[3], type=data_db_type["path"])
+    if result:
+        client.fs.chdir(int(result["content"]))
+        actions = [actions[0], "c", result["content"], actions[3]]
+    handle_common_actions(bot, message, client, db, actions)
 
 
 def handle_clear_recycle(bot, message, client: P115Client, db: SqliteDB):
@@ -1069,7 +1073,17 @@ def create_pagination(current_page, total_pages, actions):
     header_buttons = []
     page_buttons = []
 
-    for i in range(max(0, current_page - 4), min(total_pages, current_page + 5)):
+    star_page = max(0, current_page - 1)
+    end_page = min(total_pages, current_page + 3)
+
+    if end_page == total_pages:
+        star_page = total_pages - 6
+    if star_page == 0:
+        end_page = 6
+    if current_page == 1:
+        end_page = 5
+
+    for i in range(star_page, end_page):
         page_buttons.append(
             {
                 "text": f"{'📍' if i == current_page else i+1}",
@@ -1110,7 +1124,8 @@ def create_pagination(current_page, total_pages, actions):
 
     last_action = page_buttons[-1]["callback_data"].split("|")[1]
     _, last_page = last_action.split("=")
-
+    print(last_page)
+    print(last_page != str(total_pages - 1))
     if last_page != str(total_pages - 1):
         header_buttons.append(
             {
@@ -1118,7 +1133,7 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
             },
         )
-
+    print(header_buttons)
     return header_buttons
 
 
