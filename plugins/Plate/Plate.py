@@ -65,6 +65,8 @@ data_db_type = {
     "super_admin": "super_admin",
 }
 
+last_click_time = {}
+
 
 class SqliteDB(object):
     def __init__(self, bot, plugin_dir):
@@ -271,7 +273,7 @@ def Plate(bot, message):
 
     if message_type == "callback_query_data":
         callback_query_data = message["callback_query_data"]
-        result = handle_callback_query(bot, message, callback_query_data)
+        result = handle_check_callback_query(bot, message, callback_query_data)
         if result == False:
             return
         return handle_common_actions(bot, message, client, db)
@@ -406,7 +408,7 @@ def handle_save_action(bot, message, client: P115Client, action: str, db: Sqlite
         handle_save_file(bot, reply_to_message, client, db)
 
 
-def handle_callback_query(bot, message, callback_query_data: str):
+def handle_check_callback_query(bot, message, callback_query_data: str):
     # 解析回调数据
     actions = callback_query_data.split("|")
     click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
@@ -426,6 +428,19 @@ def handle_callback_query(bot, message, callback_query_data: str):
             show_alert=True,
         )
         return False
+
+    current_time = time.time()
+    if click_user_id in last_click_time:
+        if current_time - last_click_time[click_user_id] < 2:
+            bot.answerCallbackQuery(
+                callback_query_id=message["callback_query_id"],
+                text="🚫 点那么快干啥？",
+                show_alert=True,
+            )
+            return False
+
+    last_click_time[click_user_id] = current_time
+
     return True
 
 
@@ -1079,7 +1094,7 @@ def create_pagination(current_page, total_pages, actions):
 
     fisrt_action = page_buttons[0]["callback_data"].split("|")[1]
     _, fisrt_page = fisrt_action.split("=")
-    
+
     if fisrt_page != "0":
         header_buttons.insert(
             0,
