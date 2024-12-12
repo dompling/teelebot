@@ -35,6 +35,7 @@ command = {  # 命令注册
     "/wprec": "rec",
     "/wprecp": "recp",
     "/wpoff": "off",
+    "/wpoffclear": "offclear",
 }
 
 command_text = {  # 命令注册
@@ -46,7 +47,8 @@ command_text = {  # 命令注册
     "/wpcdel": "删除默认",
     "/wplogut": "登出当前账号",
     "/wplogin": "115网盘登录",
-    "/wpoff": "离线任务",
+    "/wpoff": "离线任务列表",
+    "/wpoffclear": "离线任务",
 }
 
 # 每页显示的项目数量
@@ -298,6 +300,8 @@ def Plate(bot, message):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif text.startswith("/wpsave"):
                 return handle_wp_save(bot, message, client, db)
+            elif text.startswith("/wpoffclear"):
+                return handle_off_clear(bot, message, client, int(text.split(" ")[1]))
             elif text.startswith("/wpoff"):
                 return handle_wp_off(bot, message, client)
             elif command[text]:
@@ -375,6 +379,24 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         msg = f"✅上传成功"
         if resp.get("statusmsg"):
             msg = resp["statusmsg"]
+        if ".torrent" in json.dumps(resp, ensure_ascii=False):
+            torrent_info = client.offline_torrent_info({"sha1": resp["data"]["sha1"]})
+            if torrent_info.get("info_hash"):
+                wanted = []
+                msg += "\n增加下列离线任务：\n"
+                for i in range(torrent_info["file_count"]):
+                    msg += (
+                        f"（{i+1}）.{torrent_info['torrent_filelist_web'][i]['path']}"
+                    )
+                    wanted.append(f"{i}")
+                if len(wanted):
+                    client.offline_add_torrent(
+                        {
+                            "info_hash": torrent_info["info_hash"],
+                            "wanted": ",".join(wanted),
+                        }
+                    )
+                    handle_wp_off(bot, message, client)
         update_msg_text(bot, status, msg)
 
 
@@ -556,7 +578,9 @@ def send_plugin_info(bot, chat_id, message_id):
         + "<b>/wpconfig</b> - 网盘功能\n"
         + "<b>/wpdown</b> - 下载文件\n"
         + "<b>/wpdel</b> - 删除文件和目录\n"
-        + "<b>/wprecp</b> - 回收站密码（命令+空格+密码）"
+        + "<b>/wprecp</b> - 回收站密码（命令+空格+密码）\n"
+        + "<b>/wpoff</b> - 离线任务\n"
+        + "<b>/wpoffclear</b> - 清理离线任务（命令+空格+数字） 0(完成) 1(全部) 2(失败) 3(进行) 4(已完成+删除源文件) 5(全部+删除源文件)\n"
     )
     status = bot.sendMessage(
         chat_id=chat_id,
@@ -581,7 +605,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
         current_path = client.fs.getcwd()
         if current_path == "/":
             current_path = "根目录"
-        msg += f"\n<b>🗂️默认保存：{current_path}</b>"
+        msg += f"\n<b>🗂️默认目录：{current_path}</b>"
 
     fs_info = client.fs_index_info()
     if fs_info["error"] == "":
@@ -609,6 +633,13 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                     {"text": "删除默认目录", "callback_data": f"/wpcdel|{user_id}"},
                 ],
                 [
+                    {"text": "离线列表", "callback_data": f"/wpoff|{user_id}"},
+                    {"text": "清空完成", "callback_data": f"/wpoffclear|0|{user_id}"},
+                    {"text": "清空全部", "callback_data": f"/wpoffclear|1|{user_id}"},
+                    {"text": "清空失败", "callback_data": f"/wpoffclear|2|{user_id}"},
+                    {"text": "清空进行", "callback_data": f"/wpoffclear|3|{user_id}"},
+                ],
+                [
                     {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
                     {"text": "下载文件", "callback_data": f"/wpdown|{user_id}"},
                 ],
@@ -633,6 +664,8 @@ def handle_common_actions(
     else:
         callback_query_data = message.get("callback_query_data")
         actions = callback_query_data.split("|")
+    current_actions = []
+    current_actions.extend(actions)
     # 0：commond 命令，1：目录操作命令(p翻译,d取消,c进入,.返回,e执行)，2：目录 id,3:用户 id
 
     if len(actions) != 4:
@@ -658,8 +691,11 @@ def handle_common_actions(
             if result:
                 client.fs.chdir(int(result["content"]))
                 actions = [actions[0], "c", result["content"], actions[3]]
-
             handle_sendMessage(bot, message, client, actions)
+        elif actions[0] == "/wpoffclear":
+            handle_off_clear(bot, message, client, int(current_actions[1]))
+        elif actions[0] == "/wpoff":
+            handle_wp_off(bot, message, client)    
     else:
         ## 目录功能命令
         if "p=" in actions[1]:
@@ -704,8 +740,13 @@ def handle_common_actions(
 
 
 def handle_wp_off(bot, message, client: P115Client):
-    # client.offline_clear({"flag": 0})
     offline_list = client.offline_list()
+    if not offline_list.get("tasks"):
+        status= bot.sendMessage(
+            chat_id=message["chat"]["id"], text="🚫无离线列表", parse_mode="HTML"
+        )
+        bot.message_deletor(5, message["chat"]["id"], status["message_id"])
+        return
     status = {"1": "进行中", "-1": "失败", "2": "完成"}
     dataSource = ["-"]
 
@@ -749,6 +790,11 @@ def handle_wp_off(bot, message, client: P115Client):
     )
 
     bot.message_deletor(10, message["chat"]["id"], status["message_id"])
+
+
+def handle_off_clear(bot, message, client: P115Client, flag=0):
+    client.offline_clear({"flag": flag})
+    handle_wp_off(bot, message, client)
 
 
 def handle_download_file(bot, message, client: P115Client, actions):
