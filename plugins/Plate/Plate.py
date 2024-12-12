@@ -34,6 +34,7 @@ command = {  # 命令注册
     "/wplogin": "login",
     "/wprec": "rec",
     "/wprecp": "recp",
+    "/wpoff": "off",
 }
 
 command_text = {  # 命令注册
@@ -45,6 +46,7 @@ command_text = {  # 命令注册
     "/wpcdel": "删除默认",
     "/wplogut": "登出当前账号",
     "/wplogin": "115网盘登录",
+    "/wpoff": "离线任务",
 }
 
 # 每页显示的项目数量
@@ -296,6 +298,8 @@ def Plate(bot, message):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif text.startswith("/wpsave"):
                 return handle_wp_save(bot, message, client, db)
+            elif text.startswith("/wpoff"):
+                return handle_wp_off(bot, message, client)
             elif command[text]:
                 result = db.find(user_id=user_id, type=data_db_type["path"])
                 if result:
@@ -699,6 +703,54 @@ def handle_common_actions(
                 handle_download_file(bot, message, client, actions)
 
 
+def handle_wp_off(bot, message, client: P115Client):
+    # client.offline_clear({"flag": 0})
+    offline_list = client.offline_list()
+    status = {"1": "进行中", "-1": "失败", "2": "完成"}
+    dataSource = ["-"]
+
+    for task in offline_list["tasks"]:
+        dataSource.append(
+            {
+                "name": task["name"],
+                "percentDone": str(task["percentDone"]),
+                "status": status.get(str(task["status"]), "未知状态"),
+            }
+        )
+
+    columns = {
+        "title": "离线下载列表",
+        "columns": [
+            {"title": "文件", "dataIndex": "name", "width": 500},
+            {
+                "title": "进度",
+                "dataIndex": "percentDone",
+                "width": 100,
+                "align": "center",
+            },
+            {"title": "状态", "dataIndex": "status", "width": 100, "align": "center"},
+        ],
+        "dataSource": dataSource,
+    }
+    options = {
+        "paddingVertical": 20,
+        "paddingHorizontal": 20,
+        "backgroundColor": "%23eee",
+        "fontFamily": "mono",
+    }
+    table_string = f"https://api.quickchart.io/v1/table?data={json.dumps(columns,ensure_ascii=False)}&options={json.dumps(options,ensure_ascii=False)}"
+    table = requests.get(table_string)
+
+    status = bot.sendPhoto(
+        chat_id=message["chat"]["id"],
+        photo=table.content,
+        parse_mode="HTML",
+        reply_to_message_id=message["message_id"],
+    )
+
+    bot.message_deletor(10, message["chat"]["id"], status["message_id"])
+
+
 def handle_download_file(bot, message, client: P115Client, actions):
     content_attr = client.fs.attr(int(actions[2]))
     if content_attr["is_directory"] == False:
@@ -886,7 +938,7 @@ def send_type_msg(bot, message, msg, mime_type, file, file_name):
 
 def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     response = client.offline_add_url({"url": url, "wp_path_id": save_path})
-    text = message.get("caption", "") + "\n离线任务保存成功"
+    text = "✅离线任务保存成功"
     if response.get("error_msg"):
         text = "🚫" + response["error_msg"]
     update_msg_text(bot, message, text)
@@ -1132,7 +1184,7 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
             },
         )
-    
+
     return header_buttons
 
 
@@ -1214,11 +1266,11 @@ def macth_content(content):
     if link:
         return "115_url", link.group(0)
 
-    magnet_link = re.search(r"magnet:\?xt=urn:btih:[0-9a-fA-F]{40,}.*", content)
+    magnet_link = re.search(r'(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})"', content)
     if magnet_link:
         return "magent_url", magnet_link.group(0)
 
-    ed2k_link = re.search(r"(ed2k://\|file\|.*?\|/\n)", content)
+    ed2k_link = re.search(r"(ed2k://\|file\|[^|]+\|\d+\|[a-fA-F0-9]+\|/)", content)
     if ed2k_link:
         return "magent_url", ed2k_link.group(1)
 
