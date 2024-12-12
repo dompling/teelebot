@@ -304,7 +304,7 @@ def Plate(bot, message):
                 return handle_off_clear(bot, message, client, int(text.split(" ")[1]))
             elif text.startswith("/wpoff"):
                 return handle_wp_off(bot, message, client)
-            elif command[text]:
+            elif command.get(text):
                 result = db.find(user_id=user_id, type=data_db_type["path"])
                 if result:
                     client.fs.chdir(int(result["content"]))
@@ -320,39 +320,42 @@ def Plate(bot, message):
         """处理私聊，直接保存功能"""
         if cookies and count == 0:
             reply_to_message = message.get("reply_to_message", message)
-            content = reply_to_message.get("text", reply_to_message.get("caption", ""))
             share_type = macth_content(json.dumps(reply_to_message, ensure_ascii=False))
             if share_type:
                 handle_wp_save(bot, message, client, db)
 
 
 def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
+
     user_id = message["from"]["id"]
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
+
     if user_default_path == False:
         return
+    reply_to_message = message.get("reply_to_message", message)
     # print(message)
     file_id = ""
     # file_size = -1
     file_name = ""
-    if message.get("photo"):
-        photo = max(message["photo"], key=lambda x: x["file_size"])
+    if reply_to_message.get("photo"):
+        photo = max(reply_to_message["photo"], key=lambda x: x["file_size"])
         file_id = photo["file_id"]
         file_size = photo["file_size"]
         file_name = photo["file_unique_id"] + ".png"
-    elif message.get("video"):
-        file_id = message["video"]["file_id"]
+    elif reply_to_message.get("video"):
+        file_id = reply_to_message["video"]["file_id"]
         # file_size = message["video"]["file_size"]
-        file_name = message["video"]["file_name"]
-    elif message.get("audio"):
-        file_id = message["audio"]["file_id"]
+        file_name = reply_to_message["video"]["file_name"]
+    elif reply_to_message.get("audio"):
+        file_id = reply_to_message["audio"]["file_id"]
         # file_size = message["video"]["file_size"]
-        file_name = message["video"]["file_name"]
+        file_name = reply_to_message["video"]["file_name"]
     else:
-        file_id = message["document"]["file_id"]
-        file_name = message["document"]["file_name"]
+        file_id = reply_to_message["document"]["file_id"]
+        file_name = reply_to_message["document"]["file_name"]
 
     if file_id:
+        
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
         chat_id = message["chat"]["id"]
         if file_dl_path == False:
@@ -363,7 +366,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
             caption="💾上传中...",
             photo=logo,
             parse_mode="HTML",
-            reply_to_message_id=message["message_id"],
+            reply_to_message_id=reply_to_message["message_id"],
         )
 
         def make_reporthook(total: None | int = None):
@@ -379,15 +382,14 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         msg = f"✅上传成功"
         if resp.get("statusmsg"):
             msg = resp["statusmsg"]
+        
+        update_msg_text(bot, status, msg)
         if ".torrent" in json.dumps(resp, ensure_ascii=False):
             torrent_info = client.offline_torrent_info({"sha1": resp["data"]["sha1"]})
             if torrent_info.get("info_hash"):
                 wanted = []
-                msg += "\n增加下列离线任务：\n"
+                msg = f"增加下列离线任务：\n任务名称：{torrent_info['torrent_name']}\n文件数量：{torrent_info['file_count']}"
                 for i in range(torrent_info["file_count"]):
-                    msg += (
-                        f"（{i+1}）.{torrent_info['torrent_filelist_web'][i]['path']}"
-                    )
                     wanted.append(f"{i}")
                 if len(wanted):
                     client.offline_add_torrent(
@@ -396,8 +398,9 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
                             "wanted": ",".join(wanted),
                         }
                     )
-                    handle_wp_off(bot, message, client)
-        update_msg_text(bot, status, msg)
+                    handle_wp_off(bot, message, client,msg=msg)
+        
+       
 
 
 def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
@@ -418,7 +421,6 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
 
 def handle_save_action(bot, message, client: P115Client, action: str, db: SqliteDB):
     reply_to_message = message.get("reply_to_message", message)
-    content = reply_to_message.get("text", reply_to_message.get("caption", ""))
     share_type, url = macth_content(json.dumps(reply_to_message, ensure_ascii=False))
     reply_to_message_keys = reply_to_message.keys()
     if share_type == "115_url":
@@ -431,7 +433,7 @@ def handle_save_action(bot, message, client: P115Client, action: str, db: Sqlite
         or "audio" in reply_to_message_keys
         or "document" in reply_to_message_keys
     ):
-        handle_save_file(bot, reply_to_message, client, db)
+        handle_save_file(bot, message, client, db)
 
 
 def handle_check_callback_query(bot, message, callback_query_data: str):
@@ -634,10 +636,13 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                 ],
                 [
                     {"text": "离线列表", "callback_data": f"/wpoff|{user_id}"},
-                    {"text": "清空完成", "callback_data": f"/wpoffclear|0|{user_id}"},
                     {"text": "清空全部", "callback_data": f"/wpoffclear|1|{user_id}"},
+                ],
+                [   
+                    {"text": "清空完成", "callback_data": f"/wpoffclear|0|{user_id}"},
+                   
                     {"text": "清空失败", "callback_data": f"/wpoffclear|2|{user_id}"},
-                    {"text": "清空进行", "callback_data": f"/wpoffclear|3|{user_id}"},
+                    {"text": "清空进行", "callback_data": f"/wpoffclear|3|{user_id}"}
                 ],
                 [
                     {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
@@ -739,7 +744,7 @@ def handle_common_actions(
                 handle_download_file(bot, message, client, actions)
 
 
-def handle_wp_off(bot, message, client: P115Client):
+def handle_wp_off(bot, message, client: P115Client,msg=""):
     offline_list = client.offline_list()
     if not offline_list.get("tasks"):
         status= bot.sendMessage(
@@ -769,7 +774,7 @@ def handle_wp_off(bot, message, client: P115Client):
                 "width": 100,
                 "align": "center",
             },
-            {"title": "状态", "dataIndex": "status", "width": 100, "align": "center"},
+            {"title": "状态", "dataIndex": "status", "width": 50, "align": "center"},
         ],
         "dataSource": dataSource,
     }
@@ -785,6 +790,7 @@ def handle_wp_off(bot, message, client: P115Client):
     status = bot.sendPhoto(
         chat_id=message["chat"]["id"],
         photo=table.content,
+        caption=msg,
         parse_mode="HTML",
         reply_to_message_id=message["message_id"],
     )
