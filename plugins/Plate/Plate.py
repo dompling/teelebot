@@ -294,6 +294,15 @@ def Plate(bot, message):
                 return handle_admin_commands(bot, message, db, super_admin)
             elif text.startswith("/wpsave"):
                 return handle_wp_save(bot, message, client, db)
+            elif command[text]:
+                result = db.find(user_id=user_id, type=data_db_type["path"])
+                if result:
+                    client.fs.chdir(int(result["content"]))
+                    actions = [text, "c", result["content"], user_id]
+                else:
+                    actions = [text, "c", 0, user_id]
+                return handle_sendMessage(bot, message, client, actions, is_edit=False)
+
         else:
             handle_login(bot, message)
 
@@ -302,7 +311,7 @@ def Plate(bot, message):
         if cookies and count == 0:
             reply_to_message = message.get("reply_to_message", message)
             content = reply_to_message.get("text", reply_to_message.get("caption", ""))
-            share_type = macth_content(content)
+            share_type = macth_content(json.dumps(reply_to_message, ensure_ascii=False))
             if share_type:
                 handle_wp_save(bot, message, client, db)
 
@@ -382,7 +391,7 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
 def handle_save_action(bot, message, client: P115Client, action: str, db: SqliteDB):
     reply_to_message = message.get("reply_to_message", message)
     content = reply_to_message.get("text", reply_to_message.get("caption", ""))
-    share_type, url = macth_content(content)
+    share_type, url = macth_content(json.dumps(reply_to_message, ensure_ascii=False))
     reply_to_message_keys = reply_to_message.keys()
     if share_type == "115_url":
         handle_save_share_url(bot, message, client, url, action)
@@ -525,7 +534,9 @@ def send_plugin_info(bot, chat_id, message_id):
         + "<b>/wpsave</b> - 内容保存到网盘\n"
         + "<b>/wplogout</b> - 退出重新登录\n"
         + "<b>/wpadmin</b> - 设置管理员\n"
-        + "<b>/wpconfig</b> - 网盘配置\n"
+        + "<b>/wpconfig</b> - 网盘功能\n"
+        + "<b>/wpdown</b> - 下载文件\n"
+        + "<b>/wpdel</b> - 删除文件和目录\n"
         + "<b>/wprecp</b> - 回收站密码（命令+空格+密码）"
     )
     status = bot.sendMessage(
@@ -1037,16 +1048,18 @@ def create_pagination(current_page, total_pages, actions):
     cid = actions[2]
     userid = actions[3]
     header_buttons = []
+    page_buttons = []
 
     for i in range(max(0, current_page - 4), min(total_pages, current_page + 5)):
-        header_buttons.append(
+        page_buttons.append(
             {
                 "text": f"{'📍' if i == current_page else i+1}",
                 "callback_data": f"{c}|p={i}|{cid}|{userid}",
             }
         )
-        
-        
+
+    header_buttons.extend(page_buttons)
+
     if current_page > 0:
         header_buttons.insert(
             0,
@@ -1064,11 +1077,10 @@ def create_pagination(current_page, total_pages, actions):
             }
         )
 
+    fisrt_action = page_buttons[0]["callback_data"].split("|")[1]
+    _, fisrt_page = fisrt_action.split("=")
     
-    page_action = header_buttons[0]['callback_data'].split("|")[1]
-    _, page = page_action.split("=")
-    
-    if page != "0":
+    if fisrt_page != "0":
         header_buttons.insert(
             0,
             {
@@ -1076,11 +1088,11 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p=0|{cid}|{userid}",
             },
         )
-        
-    page_action = header_buttons[-1]['callback_data'].split("|")[1]
-    _, page = page_action.split("=")
-    
-    if page != str(total_pages - 1):
+
+    last_action = page_buttons[-1]["callback_data"].split("|")[1]
+    _, last_page = last_action.split("=")
+
+    if last_page != str(total_pages - 1):
         header_buttons.append(
             {
                 "text": f">>",
