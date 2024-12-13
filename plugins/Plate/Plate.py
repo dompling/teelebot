@@ -994,6 +994,7 @@ def handle_magnet_url(bot, message, client: P115Client, url, save_path):
     if response.get("error_msg"):
         text = "🚫" + response["error_msg"]
     update_msg_text(bot, message, text)
+    handle_wp_off(bot, message, client)
 
 
 # 保存分享链接
@@ -1318,7 +1319,8 @@ def macth_content(content):
     if link:
         return "115_url", link.group(0)
 
-    magnet_link = re.search(r'(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})"', content)
+    magnet_link = re.search(r'(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})', content)
+
     if magnet_link:
         return "magent_url", magnet_link.group(0)
 
