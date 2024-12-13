@@ -764,11 +764,11 @@ def handle_wp_off(bot, message, client: P115Client, msg=""):
     columns = {
         "title": "离线下载列表",
         "columns": [
-            {"title": "文件", "dataIndex": "name", "width": 500},
+            {"title": "文件", "dataIndex": "name", "width": 400},
             {
                 "title": "进度",
                 "dataIndex": "percentDone",
-                "width": 100,
+                "width": 200,
                 "align": "center",
             },
             {"title": "状态", "dataIndex": "status", "width": 50, "align": "center"},
