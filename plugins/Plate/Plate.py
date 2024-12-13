@@ -331,6 +331,8 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
 
     if user_default_path == False:
+        status = bot.sendMessage(chat_id=message["chat"]["id"],text="🚫保存文件，请设置目录")
+        bot.message_deletor(5, chat_id, status["message_id"])
         return
     reply_to_message = message.get("reply_to_message", message)
     # print(message)
@@ -396,6 +398,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
                         {
                             "info_hash": torrent_info["info_hash"],
                             "wanted": ",".join(wanted),
+                            "wp_path_id": int(user_default_path["content"]),
                         }
                     )
                     handle_wp_off(bot, message, client, msg=msg)
@@ -764,14 +767,14 @@ def handle_wp_off(bot, message, client: P115Client, msg=""):
     columns = {
         "title": "离线下载列表",
         "columns": [
-            {"title": "文件", "dataIndex": "name", "width": 400},
+            {"title": "文件", "dataIndex": "name", "width": 600},
             {
                 "title": "进度",
                 "dataIndex": "percentDone",
-                "width": 200,
-                "align": "center",
+                "width": 100,
+                "align": "right",
             },
-            {"title": "状态", "dataIndex": "status", "width": 50, "align": "center"},
+            {"title": "状态", "dataIndex": "status", "width": 100, "align": "right"},
         ],
         "dataSource": dataSource,
     }
