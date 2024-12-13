@@ -355,7 +355,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         file_name = reply_to_message["document"]["file_name"]
 
     if file_id:
-        
+
         file_dl_path = bot.getFileDownloadPath(file_id=file_id)
         chat_id = message["chat"]["id"]
         if file_dl_path == False:
@@ -382,7 +382,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
         msg = f"✅上传成功"
         if resp.get("statusmsg"):
             msg = resp["statusmsg"]
-        
+
         update_msg_text(bot, status, msg)
         if ".torrent" in json.dumps(resp, ensure_ascii=False):
             torrent_info = client.offline_torrent_info({"sha1": resp["data"]["sha1"]})
@@ -398,9 +398,7 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
                             "wanted": ",".join(wanted),
                         }
                     )
-                    handle_wp_off(bot, message, client,msg=msg)
-        
-       
+                    handle_wp_off(bot, message, client, msg=msg)
 
 
 def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
@@ -638,11 +636,10 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                     {"text": "离线列表", "callback_data": f"/wpoff|{user_id}"},
                     {"text": "清空全部", "callback_data": f"/wpoffclear|1|{user_id}"},
                 ],
-                [   
+                [
                     {"text": "清空完成", "callback_data": f"/wpoffclear|0|{user_id}"},
-                   
                     {"text": "清空失败", "callback_data": f"/wpoffclear|2|{user_id}"},
-                    {"text": "清空进行", "callback_data": f"/wpoffclear|3|{user_id}"}
+                    {"text": "清空进行", "callback_data": f"/wpoffclear|3|{user_id}"},
                 ],
                 [
                     {"text": "删除文件或目录", "callback_data": f"/wpdel|{user_id}"},
@@ -700,7 +697,7 @@ def handle_common_actions(
         elif actions[0] == "/wpoffclear":
             handle_off_clear(bot, message, client, int(current_actions[1]))
         elif actions[0] == "/wpoff":
-            handle_wp_off(bot, message, client)    
+            handle_wp_off(bot, message, client)
     else:
         ## 目录功能命令
         if "p=" in actions[1]:
@@ -744,10 +741,10 @@ def handle_common_actions(
                 handle_download_file(bot, message, client, actions)
 
 
-def handle_wp_off(bot, message, client: P115Client,msg=""):
+def handle_wp_off(bot, message, client: P115Client, msg=""):
     offline_list = client.offline_list()
     if not offline_list.get("tasks"):
-        status= bot.sendMessage(
+        status = bot.sendMessage(
             chat_id=message["chat"]["id"], text="🚫无离线列表", parse_mode="HTML"
         )
         bot.message_deletor(5, message["chat"]["id"], status["message_id"])
@@ -1181,11 +1178,11 @@ def create_pagination(current_page, total_pages, actions):
     end_page = min(total_pages, current_page + 3)
 
     if end_page == total_pages:
-        star_page = total_pages - 6
+        star_page = max(0, total_pages - 6)
     if star_page == 0:
-        end_page = 6
+        end_page = min(total_pages, 6)
     if current_page == 1:
-        end_page = 5
+        end_page = min(total_pages, 5)
 
     for i in range(star_page, end_page):
         page_buttons.append(
