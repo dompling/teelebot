@@ -20,8 +20,8 @@ available_app = "115android"
 
 prefix = "/wp"
 
-url_115_params = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/(?P<share_code>[a-zA-Z0-9]+)(?:\?password=(?P<receive_code>[a-zA-Z0-9]+))?"
-url_115_rex = r"(?:https?:\/\/)?(?:www\.)?115\.com\/s\/([a-zA-Z0-9]+)(?:\?password=([a-zA-Z0-9]+))?"
+url_115_params = r"(?:https?:\/\/)?(?:www\.)?.*\.com\/s\/(?P<share_code>[a-zA-Z0-9]+)(?:\?password=(?P<receive_code>[a-zA-Z0-9]+))?"
+url_115_rex = r"(?:https?:\/\/)?(?:www\.)?.*\.com\/s\/([a-zA-Z0-9]+)(?:\?password=([a-zA-Z0-9]+))?"
 
 command = {  # 命令注册
     "/wpsave": "save",
