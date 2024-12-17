@@ -1253,7 +1253,7 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
             }
         )
-        
+
     if len(page_buttons):
         fisrt_action = page_buttons[0]["callback_data"].split("|")[1]
         _, fisrt_page = fisrt_action.split("=")
@@ -1355,7 +1355,20 @@ def get_page_btn(actions, client: P115Client, current):
 
 # 解析链接
 def macth_content(content):
+    match_id = re.search(r"\/s\/([a-z0-9]{10})", content)
+    match_code = re.search(r"访问码：(\d{4})", content)
+    
+    print(match_id)
+    print(match_code)
+    
+    if match_id and match_code:
+        return (
+            "115_url",
+            f"https://115.com/s/{match_id.group(1)}?password={match_code.group(1)}",
+        )
+        
     link = re.search(url_115_rex, content)
+    
     if link:
         return "115_url", link.group(0)
 
