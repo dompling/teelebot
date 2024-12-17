@@ -412,16 +412,20 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
 def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
     user_id = message["from"]["id"]
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
+    result = db.find(user_id=user_id, type=data_db_type["auto_save"])
+    actions = ["/wpsave", "c", 0, user_id]
     if user_default_path == False:
         handle_sendMessage(
             bot=bot,
             message=message,
             client=client,
-            actions=["/wpsave", "c", 0, message["from"]["id"]],
+            actions=actions,
             is_edit=False,
         )
     else:
-        actions = ["/wpsave", "e", user_default_path["content"], user_id]
+        actions[2] = user_default_path["content"]
+        if result == False:
+            actions[1] = "e"
         handle_common_actions(bot, message, client, db, actions)
 
 
