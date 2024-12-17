@@ -422,11 +422,20 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
             actions=actions,
             is_edit=False,
         )
-    else:
+    elif user_default_path:
         actions[2] = user_default_path["content"]
         if result == False:
-            actions[1] = "c"
-        handle_common_actions(bot, message, client, db, actions)
+            client.fs.chdir(int(actions[2]))
+            handle_sendMessage(
+                bot=bot,
+                message=message,
+                client=client,
+                actions=actions,
+                is_edit=False,
+            )
+        else:
+            actions[1] = "e"
+            handle_common_actions(bot, message, client, db, actions)
 
 
 def handle_save_action(bot, message, client: P115Client, action: str, db: SqliteDB):
@@ -1244,29 +1253,30 @@ def create_pagination(current_page, total_pages, actions):
                 "callback_data": f"{c}|p={current_page+1}|{cid}|{userid}",
             }
         )
+        
+    if len(page_buttons):
+        fisrt_action = page_buttons[0]["callback_data"].split("|")[1]
+        _, fisrt_page = fisrt_action.split("=")
 
-    fisrt_action = page_buttons[0]["callback_data"].split("|")[1]
-    _, fisrt_page = fisrt_action.split("=")
+        if fisrt_page != "0":
+            header_buttons.insert(
+                0,
+                {
+                    "text": "<<",
+                    "callback_data": f"{c}|p=0|{cid}|{userid}",
+                },
+            )
 
-    if fisrt_page != "0":
-        header_buttons.insert(
-            0,
-            {
-                "text": "<<",
-                "callback_data": f"{c}|p=0|{cid}|{userid}",
-            },
-        )
+        last_action = page_buttons[-1]["callback_data"].split("|")[1]
+        _, last_page = last_action.split("=")
 
-    last_action = page_buttons[-1]["callback_data"].split("|")[1]
-    _, last_page = last_action.split("=")
-
-    if last_page != str(total_pages - 1):
-        header_buttons.append(
-            {
-                "text": f">>",
-                "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
-            },
-        )
+        if last_page != str(total_pages - 1):
+            header_buttons.append(
+                {
+                    "text": f">>",
+                    "callback_data": f"{c}|p={total_pages-1}|{cid}|{userid}",
+                },
+            )
 
     return header_buttons
 
