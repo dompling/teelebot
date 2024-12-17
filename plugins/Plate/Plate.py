@@ -425,7 +425,7 @@ def handle_wp_save(bot, message, client: P115Client, db: SqliteDB):
     else:
         actions[2] = user_default_path["content"]
         if result == False:
-            actions[1] = "e"
+            actions[1] = "c"
         handle_common_actions(bot, message, client, db, actions)
 
 
