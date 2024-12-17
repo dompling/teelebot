@@ -36,9 +36,11 @@ command = {  # 命令注册
     "/wprecp": "recp",
     "/wpoff": "off",
     "/wpoffclear": "offclear",
+    "/wpautosave": "autosave",
 }
 
 command_text = {  # 命令注册
+    "/wpautosave": "autosave",
     "/wpsave": "保存",
     "/wpdown": "下载",
     "/wpdel": "删除",
@@ -64,6 +66,7 @@ with open(teelebot.bot.path_converter(log_dir), "rb") as p:
 
 data_db_type = {
     "path": "path",
+    "auto_save": "auto_save",
     "admin": "admin",
     "rec_pwd": "rec_pwd",
     "super_admin": "super_admin",
@@ -331,7 +334,9 @@ def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
     user_default_path = db.find(user_id=user_id, type=data_db_type["path"])
 
     if user_default_path == False:
-        status = bot.sendMessage(chat_id=message["chat"]["id"],text="🚫保存文件，请设置目录")
+        status = bot.sendMessage(
+            chat_id=message["chat"]["id"], text="🚫保存文件，请设置目录"
+        )
         bot.message_deletor(5, chat_id, status["message_id"])
         return
     reply_to_message = message.get("reply_to_message", message)
@@ -600,7 +605,7 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
     user_name = message["from"]["username"]  # 点击者的用户 ID
     user_id = message["from"]["id"]  # 点击者的用户 ID
     result = db.find(user_id=user_id, type=data_db_type["path"])
-
+    auto_save = db.find(user_id=user_id, type=data_db_type["auto_save"])
     msg = f"<b>🖥️当前管理:{user_name}</b>"
     if result:
         cid = result["content"]
@@ -634,6 +639,12 @@ def handle_wpconfig(bot, message, client: P115Client, db: SqliteDB):
                 [
                     {"text": "设置默认目录", "callback_data": f"/wpcset|{user_id}"},
                     {"text": "删除默认目录", "callback_data": f"/wpcdel|{user_id}"},
+                ],
+                [
+                    {
+                        "text": f"{ '取消' if auto_save else ''}自动保存默认目录",
+                        "callback_data": f"/wpautosave|{user_id}",
+                    },
                 ],
                 [
                     {"text": "离线列表", "callback_data": f"/wpoff|{user_id}"},
@@ -678,6 +689,19 @@ def handle_common_actions(
         actions = [actions[0], "e", 0, actions[1]]
         if actions[0] == "/wpcset":
             handle_sendMessage(bot, message, client, actions)
+        elif actions[0] == "/wpautosave":
+            click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
+            result = db.find(user_id=click_user_id, type=data_db_type["auto_save"])
+            if result:
+                db.delete(click_user_id, data_db_type["auto_save"])
+                return update_msg_text(bot, message, "✅取消自动保存默认目录成功")
+            else:
+                db.insert(
+                    user_id=click_user_id,
+                    type=data_db_type["auto_save"],
+                    content="auto_save",
+                )
+                return update_msg_text(bot, message, "✅设置自动保存默认目录成功")
 
         elif actions[0] == "/wpcdel":
             click_user_id = message["click_user"]["id"]  # 点击者的用户 ID
@@ -1319,7 +1343,7 @@ def macth_content(content):
     if link:
         return "115_url", link.group(0)
 
-    magnet_link = re.search(r'(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})', content)
+    magnet_link = re.search(r"(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})", content)
 
     if magnet_link:
         return "magent_url", magnet_link.group(0)
