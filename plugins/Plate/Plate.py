@@ -1037,6 +1037,8 @@ def handle_save_share_url(bot, message, client: P115Client, url, save_path):
             "receive_code": receive_code,
         }
         share_files = client.share_snap(share_params)
+        if share_files.get("error"):
+            return update_msg_text(bot, message, f"🚫{share_files.get('error')}")
         share_params["cid"] = save_path
         list_data = share_files["data"]["list"]
         share_params["file_id"] = ",".join(
