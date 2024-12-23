@@ -75,7 +75,7 @@ def _config():
         config_dir = os.path.abspath(str(Path(args.config)))
     else:
         config_dir = str(Path(
-            f"{os.path.abspath(os.path.expanduser('~'))}/teelebot/config.cfg"))
+            f"{os.path.abspath(os.path.expanduser('~'))}/.teelebot/config.cfg"))
     (path, filename) = os.path.split(config_dir)
     (filename_, extension) = os.path.splitext(filename)
     if extension != ".cfg":
