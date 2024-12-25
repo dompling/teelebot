@@ -1358,7 +1358,6 @@ def macth_content(content):
     match_id = re.search(r"\/s\/([a-z0-9]{10})", content)
     match_code = re.search(r"访问码：(\d{4})", content)
     
-    print(f"https://115.com/s/{match_id.group(1)}?password={match_code.group(1)}")
     if match_id and match_code:
         return (
             "115_url",
