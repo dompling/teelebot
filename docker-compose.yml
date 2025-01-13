@@ -1,9 +1,12 @@
 version: "3.8"
 services:
   teelebot:
-    image: teelebot_yy
+    image: dompling/teelebot
     container_name: teelebot_cus
     restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - $PWD/config:/config
       - $PWD/plugins:/plugins

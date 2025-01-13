@@ -800,7 +800,7 @@ def handle_wp_off(bot, message, client: P115Client, msg=""):
                 "status": status.get(str(task["status"]), "未知状态"),
             }
         )
-
+    
     columns = {
         "title": "离线下载列表",
         "columns": [
@@ -815,13 +815,16 @@ def handle_wp_off(bot, message, client: P115Client, msg=""):
         ],
         "dataSource": dataSource,
     }
+
     options = {
         "paddingVertical": 20,
         "paddingHorizontal": 20,
-        "backgroundColor": "%23eee",
         "fontFamily": "mono",
     }
-    table_string = f"https://api.quickchart.io/v1/table?data={json.dumps(columns,ensure_ascii=False)}&options={json.dumps(options,ensure_ascii=False)}"
+    columns = json.dumps(columns, ensure_ascii=False)
+    columns = re.sub(r"(@|&)", ".", columns)
+    table_string = f"https://api.quickchart.io/v1/table?data={columns}&options={json.dumps(options,ensure_ascii=False)}"
+
     table = requests.get(table_string)
 
     status = bot.sendPhoto(
@@ -1357,15 +1360,15 @@ def get_page_btn(actions, client: P115Client, current):
 def macth_content(content):
     match_id = re.search(r"\/s\/([a-z0-9]{10})", content)
     match_code = re.search(r"访问码：(\d{4})", content)
-    
+
     if match_id and match_code:
         return (
             "115_url",
             f"https://115.com/s/{match_id.group(1)}?password={match_code.group(1)}",
         )
-        
+
     link = re.search(url_115_rex, content)
-    
+
     if link:
         return "115_url", link.group(0)
 
