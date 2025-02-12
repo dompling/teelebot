@@ -278,54 +278,67 @@ def Plate(bot, message):
     if text[0:3] == prefix and message_type != "callback_query_data":
         bot.message_deletor(gap, message["chat"]["id"], message_id)
 
-    if message_type == "callback_query_data":
-        callback_query_data = message["callback_query_data"]
-        result = handle_check_callback_query(bot, message, callback_query_data)
-        if result == False:
-            return
-        return handle_common_actions(bot, message, client, db)
-
-    elif text.startswith("/wp"):
-        if cookies:
-            if super_admin == False and text.startswith("/wpadmin"):
-                return handle_admin_commands(bot, message, db, super_admin)
-            elif check_user_admin(bot, message, super_admin, is_admin) == False:
+    try:
+        if message_type == "callback_query_data":
+            callback_query_data = message["callback_query_data"]
+            result = handle_check_callback_query(bot, message, callback_query_data)
+            if result == False:
                 return
-            if text == "/wp":
-                return send_plugin_info(bot, chat_id, message_id)
-            elif text.startswith("/wpconfig"):
-                return handle_wpconfig(bot, message, client, db)
-            elif text.startswith("/wprecp"):
-                return handle_set_recycle_pwd(bot, message, db, user_id)
-            elif text.startswith("/wplogout"):
-                return handle_logout(bot, message, client)
-            elif text.startswith("/wpadmin"):
-                return handle_admin_commands(bot, message, db, super_admin)
-            elif text.startswith("/wpsave"):
-                return handle_wp_save(bot, message, client, db)
-            elif text.startswith("/wpoffclear"):
-                return handle_off_clear(bot, message, client, int(text.split(" ")[1]))
-            elif text.startswith("/wpoff"):
-                return handle_wp_off(bot, message, client)
-            elif command.get(text):
-                result = db.find(user_id=user_id, type=data_db_type["path"])
-                if result:
-                    client.fs.chdir(int(result["content"]))
-                    actions = [text, "c", result["content"], user_id]
-                else:
-                    actions = [text, "c", 0, user_id]
-                return handle_sendMessage(bot, message, client, actions, is_edit=False)
+            return handle_common_actions(bot, message, client, db)
 
-        else:
-            handle_login(bot, message)
+        elif text.startswith("/wp"):
+            if cookies:
+                if super_admin == False and text.startswith("/wpadmin"):
+                    return handle_admin_commands(bot, message, db, super_admin)
+                elif check_user_admin(bot, message, super_admin, is_admin) == False:
+                    return
+                if text == "/wp":
+                    return send_plugin_info(bot, chat_id, message_id)
+                elif text.startswith("/wpconfig"):
+                    return handle_wpconfig(bot, message, client, db)
+                elif text.startswith("/wprecp"):
+                    return handle_set_recycle_pwd(bot, message, db, user_id)
+                elif text.startswith("/wplogout"):
+                    return handle_logout(bot, message, client)
+                elif text.startswith("/wpadmin"):
+                    return handle_admin_commands(bot, message, db, super_admin)
+                elif text.startswith("/wpsave"):
+                    return handle_wp_save(bot, message, client, db)
+                elif text.startswith("/wpoffclear"):
+                    return handle_off_clear(
+                        bot, message, client, int(text.split(" ")[1])
+                    )
+                elif text.startswith("/wpoff"):
+                    return handle_wp_off(bot, message, client)
+                elif command.get(text):
+                    result = db.find(user_id=user_id, type=data_db_type["path"])
+                    if result:
+                        client.fs.chdir(int(result["content"]))
+                        actions = [text, "c", result["content"], user_id]
+                    else:
+                        actions = [text, "c", 0, user_id]
+                    return handle_sendMessage(
+                        bot, message, client, actions, is_edit=False
+                    )
 
-    elif chat_type == "private":
-        """处理私聊，直接保存功能"""
-        if cookies and count == 0:
-            reply_to_message = message.get("reply_to_message", message)
-            share_type = macth_content(json.dumps(reply_to_message, ensure_ascii=False))
-            if share_type:
-                handle_wp_save(bot, message, client, db)
+            else:
+                handle_login(bot, message)
+
+        elif chat_type == "private":
+            """处理私聊，直接保存功能"""
+            if cookies and count == 0:
+                reply_to_message = message.get("reply_to_message", message)
+                share_type = macth_content(
+                    json.dumps(reply_to_message, ensure_ascii=False)
+                )
+                if share_type:
+                    handle_wp_save(bot, message, client, db)
+
+    except Exception as e:
+        print(f"发生了一个错误: {e}")
+        status = bot.sendMessage(chat_id=message["chat"]["id"], text=f"🚫{e}")
+        bot.message_deletor(10, chat_id, status["message_id"])
+        return
 
 
 def handle_save_file(bot, message, client: P115Client, db: SqliteDB):
@@ -576,7 +589,12 @@ def handle_login(bot, message):
     user_id = message["from"]["id"]
     reply_markup = {
         "inline_keyboard": [
-            [{"text": "115扫码登录", "callback_data": f"/wplogin|{user_id}"}]
+            [
+                {
+                    "text": f"115扫码登录({available_app})",
+                    "callback_data": f"/wplogin|{user_id}",
+                }
+            ]
         ]
     }
     status = bot.sendChatAction(chat_id=chat_id, action="typing")
@@ -800,7 +818,7 @@ def handle_wp_off(bot, message, client: P115Client, msg=""):
                 "status": status.get(str(task["status"]), "未知状态"),
             }
         )
-    
+
     columns = {
         "title": "离线下载列表",
         "columns": [
@@ -1360,11 +1378,11 @@ def get_page_btn(actions, client: P115Client, current):
 def macth_content(content):
     match_id = re.search(r"\/s\/([a-z0-9]{10})", content)
     match_code = re.search(r"访问码：(\d{4})", content)
-
+    uri = re.search(r'https?://([^/]+)', content)
     if match_id and match_code:
         return (
             "115_url",
-            f"https://115.com/s/{match_id.group(1)}?password={match_code.group(1)}",
+            f"https://{uri.group(1)}/s/{match_id.group(1)}?password={match_code.group(1)}",
         )
 
     link = re.search(url_115_rex, content)
