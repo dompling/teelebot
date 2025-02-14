@@ -1376,9 +1376,10 @@ def get_page_btn(actions, client: P115Client, current):
 
 # 解析链接
 def macth_content(content):
-    match_id = re.search(r"\/s\/([a-z0-9]{10})", content)
+    match_id = re.search(r"\/s\/([a-z0-9]+)", content)
     match_code = re.search(r"访问码：(\d{4})", content)
     uri = re.search(r'https?://([^/]+)', content)
+
     if match_id and match_code:
         return (
             "115_url",
