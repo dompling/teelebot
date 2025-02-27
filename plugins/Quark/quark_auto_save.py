@@ -9,13 +9,17 @@ new Env('夸克自动追更');
 """
 import os
 import re
-import sys
-import json
 import time
 import random
 import requests
 from datetime import datetime
 from treelib import Tree
+
+
+CONFIG_DATA = {}
+NOTIFYS = []
+GH_PROXY = os.environ.get("GH_PROXY", "https://ghproxy.net/")
+
 
 MAGIC_REGEX = {
     "$TV": {
@@ -25,7 +29,15 @@ MAGIC_REGEX = {
 }
 
 
-class Quark:
+# 添加消息
+def add_notify(text):
+    global NOTIFYS
+    NOTIFYS.append(text)
+    print("📢", text)
+    return text
+
+
+class Quarks:
     BASE_URL = "https://drive-pc.quark.cn"
     BASE_URL_APP = "https://drive-m.quark.cn"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/3.14.2 Chrome/112.0.5615.165 Electron/24.1.3.8 Safari/537.36 Channel/pckk_other_ch"
@@ -374,6 +386,17 @@ class Quark:
     # ↑ 请求函数
     # ↓ 操作函数
 
+    # 魔法正则匹配
+    def magic_regex_func(self, pattern, replace, taskname=None):
+        magic_regex = CONFIG_DATA.get("magic_regex") or MAGIC_REGEX or {}
+        keyword = pattern
+        if keyword in magic_regex:
+            pattern = magic_regex[keyword]["pattern"]
+            if replace == "":
+                replace = magic_regex[keyword]["replace"]
+        if taskname:
+            replace = replace.replace("$TASKNAME", taskname)
+        return pattern, replace
 
     def get_id_from_url(self, url):
         url = url.replace("https://pan.quark.cn/s/", "")
@@ -474,15 +497,17 @@ class Quark:
         # 获取stoken，同时可验证资源是否失效
         is_sharing, stoken = self.get_stoken(pwd_id, passcode)
         if not is_sharing:
+            add_notify(f"❌《{task['taskname']}》：{stoken}\n")
             task["shareurl_ban"] = stoken
             return
         # print("stoken: ", stoken)
 
         updated_tree = self.dir_check_and_save(task, pwd_id, stoken, pdir_fid)
         if updated_tree.size(1) > 0:
+            add_notify(f"✅《{task['taskname']}》添加：\n{updated_tree}")
             return updated_tree
         else:
-            print(f"任务结束：没有新的转存任务")
+            add_notify(f"任务结束：没有新的转存任务")
             return False
 
     def dir_check_and_save(self, task, pwd_id, stoken, pdir_fid="", subdir_path=""):
@@ -494,16 +519,17 @@ class Quark:
         if not share_file_list:
             if subdir_path == "":
                 task["shareurl_ban"] = "分享为空，文件已被分享者删除"
+                add_notify(f"❌《{task['taskname']}》：{task['shareurl_ban']}\n")
             return tree
-        elif (
-            len(share_file_list) == 1
-            and share_file_list[0]["dir"]
-            and subdir_path == ""
-        ):  # 仅有一个文件夹
-            print("🧠 该分享是一个文件夹，读取文件夹内列表")
-            share_file_list = self.get_detail(
-                pwd_id, stoken, share_file_list[0]["fid"]
-            )["list"]
+        # elif (
+        #     len(share_file_list) == 1
+        #     and share_file_list[0]["dir"]
+        #     and subdir_path == ""
+        # ):  # 仅有一个文件夹
+        #     print("🧠 该分享是一个文件夹，读取文件夹内列表")
+        #     share_file_list = self.get_detail(
+        #         pwd_id, stoken, share_file_list[0]["fid"]
+        #     )["list"]
 
         # 获取目标目录文件列表
         savepath = re.sub(r"/{2,}", "/", f"/{task['savepath']}{subdir_path}")
@@ -620,4 +646,116 @@ class Quark:
                     err_msg = query_task_return["message"]
             else:
                 err_msg = save_file_return["message"]
+            if err_msg:
+                add_notify(f"❌《{task['taskname']}》转存失败：{err_msg}\n")
         return tree
+
+    def do_rename_task(self, task, subdir_path=""):
+        pattern, replace = self.magic_regex_func(
+            task["pattern"], task["replace"], task["taskname"]
+        )
+        if not pattern or not replace:
+            return 0
+        savepath = re.sub(r"/{2,}", "/", f"/{task['savepath']}{subdir_path}")
+        if not self.savepath_fid.get(savepath):
+            self.savepath_fid[savepath] = self.get_fids([savepath])[0]["fid"]
+        dir_file_list = self.ls_dir(self.savepath_fid[savepath])
+        dir_file_name_list = [item["file_name"] for item in dir_file_list]
+        is_rename_count = 0
+        for dir_file in dir_file_list:
+            if dir_file["dir"]:
+                is_rename_count += self.do_rename_task(
+                    task, f"{subdir_path}/{dir_file['file_name']}"
+                )
+            if re.search(pattern, dir_file["file_name"]):
+                save_name = (
+                    re.sub(pattern, replace, dir_file["file_name"])
+                    if replace != ""
+                    else dir_file["file_name"]
+                )
+                if save_name != dir_file["file_name"] and (
+                    save_name not in dir_file_name_list
+                ):
+                    rename_return = self.rename(dir_file["fid"], save_name)
+                    if rename_return["code"] == 0:
+                        print(f"重命名：{dir_file['file_name']} → {save_name}")
+                        is_rename_count += 1
+                    else:
+                        print(
+                            f"重命名：{dir_file['file_name']} → {save_name} 失败，{rename_return['message']}"
+                        )
+        return is_rename_count > 0
+
+
+def verify_account(account):
+    # 验证账号
+    print(f"▶️ 验证第{account.index}个账号")
+    if "__uid" not in account.cookie:
+        print(f"💡 不存在cookie必要参数，判断为仅签到")
+        return False
+    else:
+        account_info = account.init()
+        if not account_info:
+            add_notify(f"👤 第{account.index}个账号登录失败，cookie无效❌")
+            return False
+        else:
+            print(f"👤 账号昵称: {account_info['nickname']}✅")
+            return True
+
+
+def format_bytes(size_bytes: int) -> str:
+    units = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = 0
+    while size_bytes >= 1024 and i < len(units) - 1:
+        size_bytes /= 1024
+        i += 1
+    return f"{size_bytes:.2f} {units[i]}"
+
+
+def do_sign(account):
+    if not account.mparam:
+        print("⏭️ 移动端参数未设置，跳过签到")
+        print()
+        return
+    # 每日领空间
+    growth_info = account.get_growth_info()
+    if growth_info:
+        growth_message = f"💾 {'88VIP' if growth_info['88VIP'] else '普通用户'} 总空间：{format_bytes(growth_info['total_capacity'])}，签到累计获得：{format_bytes(growth_info['cap_composition'].get('sign_reward', 0))}"
+        if growth_info["cap_sign"]["sign_daily"]:
+            sign_message = f"📅 签到记录: 今日已签到+{int(growth_info['cap_sign']['sign_daily_reward']/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']}/{growth_info['cap_sign']['sign_target']})✅"
+            message = f"{sign_message}\n{growth_message}"
+            print(message)
+        else:
+            sign, sign_return = account.get_growth_sign()
+            if sign:
+                sign_message = f"📅 执行签到: 今日签到+{int(sign_return/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']+1}/{growth_info['cap_sign']['sign_target']})✅"
+                message = f"{sign_message}\n{growth_message}"
+                if (
+                    str(
+                        CONFIG_DATA.get("push_config", {}).get("QUARK_SIGN_NOTIFY")
+                    ).lower()
+                    == "false"
+                    or os.environ.get("QUARK_SIGN_NOTIFY") == "false"
+                ):
+                    print(message)
+                else:
+                    message = message.replace("今日", f"[{account.nickname}]今日")
+                    add_notify(message)
+            else:
+                print(f"📅 签到异常: {sign_return}")
+
+
+def do_save(account, tasklist=[]):
+    add_notify(f"转存账号: {account.nickname}")
+    # 获取全部保存目录fid
+    account.update_savepath_fid(tasklist)
+
+    # 执行任务
+    for index, task in enumerate(tasklist):
+        add_notify(f"任务名称: {task['taskname']}")
+        add_notify(f"分享链接: {task['shareurl']}")
+        add_notify(f"保存路径: {task['savepath']}")
+        account.do_save_task(task)
+        account.do_rename_task(task)
+        
+    return NOTIFYS    
