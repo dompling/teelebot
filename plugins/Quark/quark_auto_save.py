@@ -17,10 +17,9 @@ from treelib import Tree
 
 
 CONFIG_DATA = {}
-NOTIFYS = []
 GH_PROXY = os.environ.get("GH_PROXY", "https://ghproxy.net/")
 
-
+NOTIFYS = []
 MAGIC_REGEX = {
     "$TV": {
         "pattern": r".*?(?<!\d)([Ss]\d{1,2})?([Ee]?[Pp]?[Xx]?\d{1,3})(?!\d).*?\.(mp4|mkv)",
@@ -43,6 +42,8 @@ class Quarks:
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/3.14.2 Chrome/112.0.5615.165 Electron/24.1.3.8 Safari/537.36 Channel/pckk_other_ch"
 
     def __init__(self, cookie, index=None):
+        global NOTIFYS
+        NOTIFYS = []
         self.cookie = cookie.strip()
         self.index = index + 1
         self.is_active = False

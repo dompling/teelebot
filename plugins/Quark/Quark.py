@@ -159,6 +159,12 @@ class SqliteDB(object):
         else:
             return False
 
+    def insert_or_update(self, user_id, content, type):
+        if self.find(user_id, type):
+            return self.update(user_id, type, content)
+        else:
+            return self.insert(user_id, content, type)
+
 
 def get_cookie(path):
     cookies = ""
@@ -198,6 +204,12 @@ def Quark(bot, message):
     if is_admin == False and super_admin:
         is_admin = int(super_admin["user_id"]) == user_id
 
+    save_path = db.find(user_id=user_id, type=data_db_type["path"])
+    cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
+    savepath = save_path["content"]
+    cookie = cookies["content"]
+    account = Quarks(cookie, 0)
+
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
             return handle_admin_commands(bot, message, db, super_admin)
@@ -207,9 +219,29 @@ def Quark(bot, message):
 
         bot.message_deletor(gap, message["chat"]["id"], message_id)
 
+        if text == prefix:
+            if verify_account(account):
+                notify_body = [
+                    f"转存账号：{account.nickname}",
+                    f"保存路径：{savepath}",
+                    f"使用命令：",
+                    "<b>/qk</b> - 帮助",
+                    "<b>/qkset</b> - 设置 Cookie",
+                    "<b>/qkadmin</b> - 设置管理",
+                    "<b>/qkpath</b> - 设置账号",
+                ]
+                notify_body = "\n".join(notify_body)
+                status = bot.sendMessage(
+                    text=notify_body,
+                    chat_id=chat_id,
+                    parse_mode="HTML",
+                    reply_to_message_id=message_id,
+                )
+                return bot.message_deletor(8, chat_id, status["message_id"])
+
         if text.startswith(f"{prefix}set"):
             cookies = text.split(f"{prefix}set ")[1]
-            db.insert(user_id=user_id, content=cookies, type=data_db_type["cookie"])
+            db.insert_or_update(user_id=user_id, content=cookies, type=data_db_type["cookie"])
             status = bot.sendMessage(
                 text="✅ Cookies 保存成功",
                 chat_id=chat_id,
@@ -220,7 +252,7 @@ def Quark(bot, message):
 
         if text.startswith(f"{prefix}path"):
             path = text.split(f"{prefix}path ")[1]
-            db.insert(user_id=user_id, content=path, type=data_db_type["path"])
+            db.insert_or_update(user_id=user_id, content=path, type=data_db_type["path"])
             status = bot.sendMessage(
                 text=f"✅ 默认分享链接保存路径为{path}",
                 chat_id=chat_id,
@@ -237,8 +269,6 @@ def Quark(bot, message):
 
     is_quark, uri = macth_content(json.dumps(message, ensure_ascii=False))
     if is_quark:
-        save_path = db.find(user_id=user_id, type=data_db_type["path"])
-        cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
 
         if not cookies:
             status = bot.sendMessage(
@@ -256,10 +286,6 @@ def Quark(bot, message):
             )
             return bot.message_deletor(5, chat_id, status["message_id"])
 
-        savepath = save_path["content"]
-        cookie = cookies["content"]
-
-        account = Quarks(cookie, 0)
         if not verify_account(account):
             status = bot.sendMessage(
                 chat_id=message["chat"]["id"],
@@ -279,7 +305,7 @@ def Quark(bot, message):
         }
         notify_body = do_save(account, [task])
         notify_body = "\n".join(notify_body)
-        
+
         bot.sendMessage(
             chat_id=message["chat"]["id"],
             text=notify_body,
