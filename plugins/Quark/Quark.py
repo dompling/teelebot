@@ -198,16 +198,10 @@ def Quark(bot, message):
     if is_admin == False and super_admin:
         is_admin = int(super_admin["user_id"]) == user_id
 
-    if (
-        str(user_id) == bot_id
-        or (message.get("reply_to_message") and chat_type != "private")
-        or not is_admin
-    ):
-        return
-
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
             return handle_admin_commands(bot, message, db, super_admin)
+
         if check_user_admin(bot, message, super_admin, is_admin) == False:
             return
 
@@ -234,6 +228,12 @@ def Quark(bot, message):
                 reply_to_message_id=message_id,
             )
             return bot.message_deletor(5, chat_id, status["message_id"])
+    elif (
+        str(user_id) == bot_id
+        or (message.get("reply_to_message") and chat_type != "private")
+        or not is_admin
+    ):
+        return
 
     is_quark, uri = macth_content(json.dumps(message, ensure_ascii=False))
     if is_quark:
