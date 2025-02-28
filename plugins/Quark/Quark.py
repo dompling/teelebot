@@ -279,13 +279,13 @@ def Quark(bot, message):
         }
         notify_body = do_save(account, [task])
         notify_body = "\n".join(notify_body)
-        status = bot.sendMessage(
+        
+        bot.sendMessage(
             chat_id=message["chat"]["id"],
             text=notify_body,
             parse_mode="HTML",
             reply_to_message_id=message_id,
         )
-        return bot.message_deletor(20, chat_id, status["message_id"])
 
 
 def macth_content(content):
