@@ -204,10 +204,12 @@ def Quark(bot, message):
     if message.get("reply_to_message") and chat_type != "private":
         return
 
+    if not is_admin:
+        return
+
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
             return handle_admin_commands(bot, message, db, super_admin)
-
         if check_user_admin(bot, message, super_admin, is_admin) == False:
             return
 
