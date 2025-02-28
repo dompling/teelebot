@@ -459,6 +459,8 @@ def handle_save_action(bot, message, client: P115Client, action: str, db: Sqlite
         handle_save_share_url(bot, message, client, url, action)
     elif share_type == "magent_url":
         handle_magnet_url(bot, message, client, url, action)
+    elif share_type:
+        return
     elif (
         "video" in reply_to_message_keys
         or "photo" in reply_to_message_keys
@@ -1378,7 +1380,15 @@ def get_page_btn(actions, client: P115Client, current):
 def macth_content(content):
     match_id = re.search(r"\/s\/([a-z0-9]+)", content)
     match_code = re.search(r"访问码：(\d{4})", content)
-    uri = re.search(r'https?://([^/]+)', content)
+    uri = re.search(r"https?://([^/]+)", content)
+
+    baidu = re.search(r"https:\/\/pan\.baidu\.com\/s\/([a-z0-9]+)", content)
+    if baidu:
+        return "baidu", baidu.group(0)
+
+    quark = re.search(r"https:\/\/pan\.quark\.cn\/s\/([a-z0-9]+)", content)
+    if quark:
+        return "quark", quark.group(0)
 
     if match_id and match_code:
         return (
