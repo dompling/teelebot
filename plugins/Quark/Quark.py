@@ -198,13 +198,11 @@ def Quark(bot, message):
     if is_admin == False and super_admin:
         is_admin = int(super_admin["user_id"]) == user_id
 
-    if str(user_id) == bot_id:
-        return
-
-    if message.get("reply_to_message") and chat_type != "private":
-        return
-
-    if not is_admin:
+    if (
+        str(user_id) == bot_id
+        or (message.get("reply_to_message") and chat_type != "private")
+        or not is_admin
+    ):
         return
 
     if text.startswith(prefix):
