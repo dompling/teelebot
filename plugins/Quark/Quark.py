@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import os, json, re, time, sqlite3
-from .quark_auto_save import Quarks, do_save, verify_account
+from .quark_auto_save import Quarks, do_save, verify_account,do_sign
 
 data_db_type = {
     "cookie": "cookie",
@@ -229,6 +229,7 @@ def Quark(bot, message):
                     "<b>/qkset</b> - 设置 Cookie",
                     "<b>/qkadmin</b> - 设置管理",
                     "<b>/qkpath</b> - 设置账号",
+                    "<b>/qksign</b> - 签到",
                 ]
                 notify_body = "\n".join(notify_body)
                 status = bot.sendMessage(
@@ -239,6 +240,16 @@ def Quark(bot, message):
                 )
                 return bot.message_deletor(8, chat_id, status["message_id"])
 
+        if text.startswith(f"{prefix}sign"):
+            notify_body =do_sign(account)
+            notify_body = "\n".join(notify_body)
+            bot.sendMessage(
+                chat_id=message["chat"]["id"],
+                text=notify_body,
+                parse_mode="HTML",
+                reply_to_message_id=message_id,
+            )
+            
         if text.startswith(f"{prefix}set"):
             cookies = text.split(f"{prefix}set ")[1]
             db.insert_or_update(user_id=user_id, content=cookies, type=data_db_type["cookie"])

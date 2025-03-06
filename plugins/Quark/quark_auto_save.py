@@ -745,6 +745,7 @@ def do_sign(account):
             else:
                 print(f"📅 签到异常: {sign_return}")
 
+    return NOTIFYS
 
 def do_save(account, tasklist=[]):
     add_notify(f"转存账号: {account.nickname}")
