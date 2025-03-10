@@ -861,7 +861,6 @@ def do_save_subs(account):
                 if not tree.contains(pwd_id):
                     tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
                 tree.create_node(file["file_name"], fid, parent=pwd_id)
-                print(tree)
             time.sleep(3)
     msg = tree.show(stdout=False)
     print("📢", msg)
