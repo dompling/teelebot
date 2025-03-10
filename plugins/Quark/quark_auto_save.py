@@ -824,8 +824,6 @@ def do_save_subs(account):
     for item in update_list:
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
-        if item["save_as_status"] == 1:
-            continue
         if not tree.contains(pwd_id):
             tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
         for file in item["update_files"]:
