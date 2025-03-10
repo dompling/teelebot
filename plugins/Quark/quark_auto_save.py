@@ -381,7 +381,7 @@ class Quarks:
             "fetch_update_files": 1,
             "read_update_list": 1,
             "page": 1,
-            "page_size": 20,
+            "page_size": 100,
             "fetch_total": 1,
             "conversation_id": "",
         }
@@ -421,7 +421,7 @@ class Quarks:
         response = self._send_request(
             "POST", url, json=payload, params=querystring
         ).json()
-        return response["data"]
+        return response.get("data")
 
     def recycle_remove(self, record_list):
         url = f"{self.BASE_URL}/1/clouddrive/file/recycle/remove"
@@ -824,8 +824,7 @@ def do_save_subs(account):
     for item in update_list:
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
-        if not tree.contains(pwd_id):
-            tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
+        print(f"📂{item['title']}")
         for file in item["update_files"]:
             if file["save_as_status"] == 1:
                 continue
@@ -859,6 +858,8 @@ def do_save_subs(account):
                 pdir_fid, pwd_id, fid, stoken, share_fid_token
             )
             if save_result:
+                if not tree.contains(pwd_id):
+                    tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
                 tree.create_node(file["file_name"], fid, parent=pwd_id)
                 print(tree)
             time.sleep(3)
