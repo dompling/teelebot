@@ -284,7 +284,6 @@ def Quark(bot, message):
             is_schedule = text.split(" ", 2)
             if len(is_schedule) > 1:
                 gap_key = str(is_schedule[1])
-
                 if gap_key and gap_key not in gaps.keys():
                     msg = ""
                     ok, msgg = bot.schedule.clear()

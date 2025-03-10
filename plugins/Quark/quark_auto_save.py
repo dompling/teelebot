@@ -833,6 +833,28 @@ def do_save_subs(account):
             share_fid_token = file["share_fid_token"]
             sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
             pdir_fid = sharepage_dir["pdir_fid"]
+            is_root = sharepage_dir["dir"]["pdir_fid"]
+            if is_root == "0":
+                dir_paths = [f"/电影/{item['title']}"]
+                dir_paths_exist_arr = account.get_fids(dir_paths)
+                dir_paths_exist = [item["file_path"] for item in dir_paths_exist_arr]
+                dir_paths_unexist = list(
+                    set(dir_paths) - set(dir_paths_exist) - set(["/"])
+                )
+                for dir_path in dir_paths_unexist:
+                    mkdir_return = account.mkdir(dir_path)
+                    if mkdir_return["code"] == 0:
+                        new_dir = mkdir_return["data"]
+                        dir_paths_exist_arr.append(
+                            {"file_path": dir_path, "fid": new_dir["fid"]}
+                        )
+                        print(f"创建文件夹：{dir_path}")
+                    else:
+                        print(f"创建文件夹：{dir_path} 失败, {mkdir_return['message']}")
+                # 储存目标目录的fid
+                for dir_path in dir_paths_exist_arr:
+                    pdir_fid = dir_path["fid"]
+
             save_result = account.save_sharepage(
                 pdir_fid, pwd_id, fid, stoken, share_fid_token
             )
