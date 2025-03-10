@@ -372,6 +372,57 @@ class Quarks:
         response = self._send_request("GET", url, params=querystring).json()
         return response["data"]["list"]
 
+    def subscribe_update_list(self):
+        url = f"{self.BASE_URL}/1/clouddrive/share/update_list"
+        querystring = {"pr": "ucpro", "fr": "pc", "uc_param_str": ""}
+        payload = {
+            "share_read_statues": [0, 1],
+            "fetch_max_file_update_pos": 1,
+            "fetch_update_files": 1,
+            "read_update_list": 1,
+            "page": 1,
+            "page_size": 20,
+            "fetch_total": 1,
+            "conversation_id": "",
+        }
+        response = self._send_request(
+            "POST", url, json=payload, params=querystring
+        ).json()
+        return response["data"]["list"]
+
+    def get_sharepage_dir(self, pwd_id, fid):
+        url = f"{self.BASE_URL}/1/clouddrive/share/sharepage/dir"
+        querystring = {
+            "pr": "ucpro",
+            "fr": "pc",
+            "uc_param_str": "",
+            "pwd_id": pwd_id,
+            "target_fid": fid,
+        }
+        response = self._send_request("GET", url, params=querystring).json()
+        return response["data"]
+
+    def save_sharepage(self, pdir_fid, pwd_id, fid, stoken, share_fid_token):
+        url = f"{self.BASE_URL}/1/clouddrive/share/sharepage/save"
+        querystring = {"pr": "ucpro", "fr": "pc", "uc_param_str": ""}
+        payload = {
+            "scene": "",
+            "page_original": "",
+            "to_pdir_fid": pdir_fid,
+            "pwd_id": pwd_id,
+            "stoken": stoken,
+            "pdir_fid": "",
+            "save_all": False,
+            "fid_list": [fid],
+            "fid_token_list": [share_fid_token],
+            "mode": "inc_single",
+        }
+
+        response = self._send_request(
+            "POST", url, json=payload, params=querystring
+        ).json()
+        return response["data"]
+
     def recycle_remove(self, record_list):
         url = f"{self.BASE_URL}/1/clouddrive/file/recycle/remove"
         querystring = {"uc_param_str": "", "fr": "pc", "pr": "ucpro"}
@@ -747,6 +798,7 @@ def do_sign(account):
 
     return NOTIFYS
 
+
 def do_save(account, tasklist=[]):
     add_notify(f"转存账号: {account.nickname}")
     # 获取全部保存目录fid
@@ -759,5 +811,37 @@ def do_save(account, tasklist=[]):
         add_notify(f"保存路径: {task['savepath']}")
         account.do_save_task(task)
         account.do_rename_task(task)
-        
-    return NOTIFYS    
+
+    return NOTIFYS
+
+
+def do_save_subs(account):
+    update_list = account.subscribe_update_list()
+
+    tree = Tree()
+    tree.create_node(f"订阅更新", "root")
+
+    for item in update_list:
+        pwd_id = item["pwd_id"]
+        stoken = item["stoken"]
+        if item["save_as_status"] == 1:
+            continue
+        if not tree.contains(pwd_id):
+            tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
+        for file in item["update_files"]:
+            if file["save_as_status"] == 1:
+                continue
+            fid = file["fid"]
+            share_fid_token = file["share_fid_token"]
+            sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
+            pdir_fid = sharepage_dir["pdir_fid"]
+            save_result = account.save_sharepage(
+                pdir_fid, pwd_id, fid, stoken, share_fid_token
+            )
+            if save_result:
+                tree.create_node(file["file_name"], fid, parent=pwd_id)
+                print(tree)
+            time.sleep(3)
+    msg = tree.show(stdout=False)
+    print("📢", msg)
+    return [msg]

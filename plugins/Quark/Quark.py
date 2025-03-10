@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import os, json, re, time, sqlite3
-from .quark_auto_save import Quarks, do_save, verify_account,do_sign
+from .quark_auto_save import Quarks, do_save, verify_account, do_sign, do_save_subs
 
 data_db_type = {
     "cookie": "cookie",
@@ -9,6 +9,38 @@ data_db_type = {
     "admin": "admin",
     "rec_pwd": "rec_pwd",
     "super_admin": "super_admin",
+}
+
+gaps = {
+    "1s": 1,
+    "2s": 2,
+    "5s": 5,
+    "10s": 10,
+    "15s": 15,
+    "30s": 30,
+    "45s": 45,
+    "1m": 60,
+    "2m": 120,
+    "5m": 300,
+    "10m": 600,
+    "15m": 900,
+    "30m": 1800,
+    "45m": 2700,
+    "1h": 3600,
+    "2h": 7200,
+    "4h": 10800,
+    "6h": 21600,
+    "8h": 28800,
+    "10h": 36000,
+    "12h": 43200,
+    "1d": 86400,
+    "3d": 259200,
+    "5d": 432000,
+    "7d": 604800,
+    "10d": 864000,
+    "15d": 1296000,
+    "20d": 1728000,
+    "30d": 2592000,
 }
 
 
@@ -209,7 +241,6 @@ def Quark(bot, message):
     savepath = save_path["content"]
     cookie = cookies["content"]
     account = Quarks(cookie, 0)
-
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
             return handle_admin_commands(bot, message, db, super_admin)
@@ -230,18 +261,65 @@ def Quark(bot, message):
                     "<b>/qkadmin</b> - 设置管理",
                     "<b>/qkpath</b> - 设置账号",
                     "<b>/qksign</b> - 签到",
+                    "<b>/qksub</b> - 更新订阅链接",
                 ]
                 notify_body = "\n".join(notify_body)
+                notify_body += (
+                    "\n<b>/qksub</b> - 命令+周期，定期更新\n<b>支持的周期指令：</b> \n\n"
+                    + "<b>1s 2s 5s 10s 15s 30s 45s \n"
+                    + "1m 2m 5m 10m 15m 30m 45m \n"
+                    + "1h 2h 4h 6h 8h 10h 12h \n"
+                    + "1d 3d 5d 7d 10d 15d 20d 30d"
+                    + "</b>"
+                )
                 status = bot.sendMessage(
                     text=notify_body,
                     chat_id=chat_id,
                     parse_mode="HTML",
                     reply_to_message_id=message_id,
                 )
-                return bot.message_deletor(8, chat_id, status["message_id"])
+                return bot.message_deletor(60, chat_id, status["message_id"])
+
+        if text.startswith(f"{prefix}sub"):
+            is_schedule = text.split(" ", 2)
+            if len(is_schedule) > 1:
+                gap_key = str(is_schedule[1])
+
+                if gap_key and gap_key not in gaps.keys():
+                    msg = ""
+                    ok, msgg = bot.schedule.clear()
+                    if ok:
+                        msg = "<b>已清空队列</b>"
+                    else:
+                        if msgg == "Empty":
+                            msg = "<b>队列为空</b>"
+                        elif msgg != "Cleared":
+                            msg = "<b>遇到错误</b> \n\n <i>" + msgg + "</i>"
+
+                    status = bot.sendMessage(
+                        chat_id=chat_id,
+                        text=msg,
+                        parse_mode="HTML",
+                        reply_to_message_id=message_id,
+                    )
+                    bot.message_deletor(30, status["chat"]["id"], status["message_id"])
+                    return
+                elif gap_key:
+                    run_schedule(
+                        bot=bot,
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        account=account,
+                        gap_key=gap_key,
+                    )
+                    return
+
+            send_sub_msg(
+                bot=bot, chat_id=chat_id, message_id=message_id, account=account
+            )
 
         if text.startswith(f"{prefix}sign"):
-            notify_body =do_sign(account)
+            notify_body = do_sign(account)
             notify_body = "\n".join(notify_body)
             bot.sendMessage(
                 chat_id=message["chat"]["id"],
@@ -249,10 +327,12 @@ def Quark(bot, message):
                 parse_mode="HTML",
                 reply_to_message_id=message_id,
             )
-            
+
         if text.startswith(f"{prefix}set"):
             cookies = text.split(f"{prefix}set ")[1]
-            db.insert_or_update(user_id=user_id, content=cookies, type=data_db_type["cookie"])
+            db.insert_or_update(
+                user_id=user_id, content=cookies, type=data_db_type["cookie"]
+            )
             status = bot.sendMessage(
                 text="✅ Cookies 保存成功",
                 chat_id=chat_id,
@@ -263,7 +343,9 @@ def Quark(bot, message):
 
         if text.startswith(f"{prefix}path"):
             path = text.split(f"{prefix}path ")[1]
-            db.insert_or_update(user_id=user_id, content=path, type=data_db_type["path"])
+            db.insert_or_update(
+                user_id=user_id, content=path, type=data_db_type["path"]
+            )
             status = bot.sendMessage(
                 text=f"✅ 默认分享链接保存路径为{path}",
                 chat_id=chat_id,
@@ -406,3 +488,62 @@ def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
             reply_to_message_id=message_id,
         )
         bot.message_deletor(5, chat_id, status["message_id"])
+
+
+def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
+    notify_body = do_save_subs(account)
+    if gap_key:
+        timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+        notify_body.insert(0, f"时间：{timestamp}")
+        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>")
+        
+        
+    notify_body = "\n".join(notify_body)
+    bot.sendMessage(
+        chat_id=chat_id,
+        text=notify_body,
+        parse_mode="HTML",
+        reply_to_message_id=message_id,
+    )
+
+
+def run_schedule(bot, chat_id, message_id, account, gap_key):
+    gap = gaps[gap_key]
+    gap_key = (
+        gap_key.replace("s", "秒")
+        .replace("m", "分钟")
+        .replace("h", "小时")
+        .replace("d", "天")
+    )
+    bot.schedule.clear()
+    ok, uid = bot.schedule.add(
+        gap, send_sub_msg, (bot, chat_id, message_id, account, gap_key)
+    )
+    timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+    if ok:
+        msg = (
+            "<b>⏰夸克订阅更新</b>\n\n"
+            + "周期: <code>"
+            + gap_key
+            + "</code>\n"
+            + "目标: <code>"
+            + str(chat_id)
+            + "</code>\n"
+            + "标识: <code>"
+            + str(uid)
+            + "</code>\n"
+            + "时间: <code>"
+            + str(timestamp)
+            + "</code>\n\n"
+            + "<code>此消息将在<b>60秒</b>后销毁，请尽快保存标识</code>\n"
+        )
+    else:
+        msg = ""
+        if uid == "Full":
+            msg = "<b>队列已满</b>"
+        else:
+            msg = "<b>遇到错误</b> \n\n <i>" + uid + "</i>"
+    status = bot.sendMessage(
+        chat_id=chat_id, text=msg, parse_mode="HTML", reply_to_message_id=message_id
+    )
+    bot.message_deletor(60, status["chat"]["id"], status["message_id"])
