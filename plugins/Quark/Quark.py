@@ -491,6 +491,7 @@ def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
 
 def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
     notify_body = do_save_subs(account)
+    print(notify_body)
     if gap_key:
         timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
         notify_body.insert(0, f"时间：{timestamp}")
@@ -498,7 +499,7 @@ def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
         
         
     notify_body = "\n".join(notify_body)
-    print(notify_body)
+    
     bot.sendMessage(
         chat_id=chat_id,
         text=notify_body,
