@@ -859,7 +859,7 @@ def do_save_subs(account):
             if save_result:
                 if f"📂{item['title']}" not in save_list:
                     save_list.append(f"📂{item['title']}")
-                save_list.append(f"--{file["file_name"]}")
+                save_list.append(f"——{file["file_name"]}")
             time.sleep(3)
     msg = tree.show(stdout=False)
     result = [f"📢更新文件数量：{len(save_list)}", msg]
