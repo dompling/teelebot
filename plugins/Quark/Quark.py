@@ -238,14 +238,22 @@ def Quark(bot, message):
 
     save_path = db.find(user_id=user_id, type=data_db_type["path"])
     cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
+    schedule_item = db.find(user_id=user_id, type="schedule")
+
+    schedule_info = False
+    savepath = False
+    cookie = False
 
     if save_path:
         savepath = save_path["content"]
     if cookies:
         cookie = cookies["content"]
 
+    if schedule_item:
+        schedule_info = json.loads(schedule_item["content"])
+
     account = Quarks(cookie, 0)
-    if text.startswith(prefix):
+    if text[: len(prefix)] == prefix:
         if super_admin == False and text.startswith(f"{prefix}admin"):
             return handle_admin_commands(bot, message, db, super_admin)
 
@@ -284,13 +292,41 @@ def Quark(bot, message):
                 )
                 return bot.message_deletor(60, chat_id, status["message_id"])
 
-        if text.startswith(f"{prefix}sub"):
+        if text[: len(prefix + "subl")] == prefix + "subl":
+            msg = ""
+            if not schedule_info:
+                msg = "<b>队列为空</b>"
+                status = bot.sendMessage(
+                    chat_id=chat_id,
+                    text=msg,
+                    parse_mode="HTML",
+                    reply_to_message_id=message_id,
+                )
+                bot.message_deletor(30, status["chat"]["id"], status["message_id"])
+            else:
+                print("------------------")
+                print(schedule_info)
+                print("------------------")
+
+                gap_key = schedule_info["gap_key"]
+                run_schedule(
+                    bot=bot,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    account=account,
+                    gap_key=gap_key,
+                    user_id=user_id,
+                    db=db,
+                    schedule_info=schedule_info,
+                )
+
+        elif text[: len(prefix + "sub")] == prefix + "sub":
             is_schedule = text.split(" ", 2)
             if len(is_schedule) > 1:
                 gap_key = str(is_schedule[1])
                 if gap_key and gap_key not in gaps.keys():
                     msg = ""
-                    ok, msgg = bot.schedule.clear()
+                    ok, msgg = bot.schedule.delete(schedule_info["uid"])
                     if ok:
                         msg = "<b>已清空队列</b>"
                     else:
@@ -314,6 +350,9 @@ def Quark(bot, message):
                         message_id=message_id,
                         account=account,
                         gap_key=gap_key,
+                        user_id=user_id,
+                        db=db,
+                        schedule_info=schedule_info,
                     )
                     return
 
@@ -321,7 +360,7 @@ def Quark(bot, message):
                 bot=bot, chat_id=chat_id, message_id=message_id, account=account
             )
 
-        if text.startswith(f"{prefix}sign"):
+        elif text[: len(prefix + "sign")] == prefix + "sign":
             notify_body = do_sign(account)
             notify_body = "\n".join(notify_body)
             bot.sendMessage(
@@ -331,7 +370,7 @@ def Quark(bot, message):
                 reply_to_message_id=message_id,
             )
 
-        if text.startswith(f"{prefix}set"):
+        elif text[: len(prefix + "set")] == prefix + "set":
             cookies = text.split(f"{prefix}set ")[1]
             db.insert_or_update(
                 user_id=user_id, content=cookies, type=data_db_type["cookie"]
@@ -344,7 +383,7 @@ def Quark(bot, message):
             )
             return bot.message_deletor(5, chat_id, status["message_id"])
 
-        if text.startswith(f"{prefix}path"):
+        elif text[: len(prefix + "path")] == prefix + "path":
             path = text.split(f"{prefix}path ")[1]
             db.insert_or_update(
                 user_id=user_id, content=path, type=data_db_type["path"]
@@ -502,15 +541,16 @@ def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
             reply_to_message_id=message_id,
         )
         return bot.message_deletor(20, chat_id, status["message_id"])
-    
+
     notify_body = do_save_subs(account)
+
     if gap_key:
         timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-        notify_body.insert(0, f"时间：{timestamp}")
-        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>")
+        notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
+        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
 
     notify_body = "\n".join(notify_body)
-
+    print(notify_body)
     bot.sendMessage(
         chat_id=chat_id,
         text=notify_body,
@@ -519,7 +559,10 @@ def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
     )
 
 
-def run_schedule(bot, chat_id, message_id, account, gap_key):
+def run_schedule(
+    bot, chat_id, message_id, account, gap_key, user_id, db: SqliteDB, schedule_info
+):
+    gap_orign_key = gap_key
     gap = gaps[gap_key]
     gap_key = (
         gap_key.replace("s", "秒")
@@ -527,7 +570,8 @@ def run_schedule(bot, chat_id, message_id, account, gap_key):
         .replace("h", "小时")
         .replace("d", "天")
     )
-    bot.schedule.clear()
+    if schedule_info:
+        bot.schedule.delete(schedule_info["uid"])
     ok, uid = bot.schedule.add(
         gap, send_sub_msg, (bot, chat_id, message_id, account, gap_key)
     )
@@ -555,6 +599,13 @@ def run_schedule(bot, chat_id, message_id, account, gap_key):
             msg = "<b>队列已满</b>"
         else:
             msg = "<b>遇到错误</b> \n\n <i>" + uid + "</i>"
+    db.insert_or_update(
+        user_id,
+        json.dumps(
+            {"gap_key": gap_orign_key, "chat_id": chat_id, "uid": uid, "time": timestamp}
+        ),
+        "schedule",
+    )
     status = bot.sendMessage(
         chat_id=chat_id, text=msg, parse_mode="HTML", reply_to_message_id=message_id
     )
