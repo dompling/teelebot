@@ -813,19 +813,19 @@ def do_sign(account):
 
 
 def do_save(account, tasklist=[]):
-    add_notify(f"转存账号: {account.nickname}")
+    add_notify(f"<b>转存账号</b>: {account.nickname}")
     # 获取全部保存目录fid
     account.update_savepath_fid(tasklist)
-
     # 执行任务
     for index, task in enumerate(tasklist):
-        add_notify(f"任务名称: {task['taskname']}")
-        add_notify(f"分享链接: {task['shareurl']}")
-        add_notify(f"保存路径: {task['savepath']}")
+        add_notify(f"<b>任务名称</b>: {task['taskname']}")
+        # add_notify(f"分享链接: {task['shareurl']}")
+        add_notify(f"<b>保存路径</b>: {task['savepath']}")
         account.do_save_task(task)
         account.do_rename_task(task)
-        time.sleep(5)
-
+        if index + 1 != len(tasklist):
+            print("📢 停止执行 3s")
+            time.sleep(3)
     return NOTIFYS
 
 
@@ -855,5 +855,8 @@ def do_save_subs(account):
                 "replace": "",
                 "enddate": "2099-01-30",
             }
-        )   
+        )
+    msg = ["📢订阅内容暂无更新"]
+    if len(tasks) == 0:
+        return msg
     return do_save(account, tasks)

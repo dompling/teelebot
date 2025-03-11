@@ -238,12 +238,12 @@ def Quark(bot, message):
 
     save_path = db.find(user_id=user_id, type=data_db_type["path"])
     cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
-    
+
     if save_path:
         savepath = save_path["content"]
     if cookies:
         cookie = cookies["content"]
-    
+
     account = Quarks(cookie, 0)
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
@@ -494,15 +494,23 @@ def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
 
 
 def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
+    if not verify_account(account):
+        status = bot.sendMessage(
+            chat_id=chat_id,
+            text="🚫Cookie访问频繁，请更换或者稍后再试",
+            parse_mode="HTML",
+            reply_to_message_id=message_id,
+        )
+        return bot.message_deletor(20, chat_id, status["message_id"])
+    
     notify_body = do_save_subs(account)
     if gap_key:
         timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
         notify_body.insert(0, f"时间：{timestamp}")
         notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>")
-        
-        
+
     notify_body = "\n".join(notify_body)
-    
+
     bot.sendMessage(
         chat_id=chat_id,
         text=notify_body,
