@@ -238,8 +238,12 @@ def Quark(bot, message):
 
     save_path = db.find(user_id=user_id, type=data_db_type["path"])
     cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
-    savepath = save_path["content"]
-    cookie = cookies["content"]
+    
+    if save_path:
+        savepath = save_path["content"]
+    if cookie:    
+        cookie = cookies["content"]
+    
     account = Quarks(cookie, 0)
     if text.startswith(prefix):
         if super_admin == False and text.startswith(f"{prefix}admin"):
