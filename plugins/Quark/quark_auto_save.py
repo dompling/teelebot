@@ -871,5 +871,5 @@ def do_save_subs(account):
                 update_files += 1
     result = [f"📢更新文件数量：{update_files}"]
     result.extend(save_list)
-    print("📢", result)
+    print(result)
     return result
