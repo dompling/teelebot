@@ -14,6 +14,17 @@ import random
 import requests
 from datetime import datetime
 from treelib import Tree
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
+# 定义钩子函数
+def log_response(response, *args, **kwargs):
+    logging.info(f"Request URL:{response.request.method} {response.request.url}\n\n")
 
 
 CONFIG_DATA = {}
@@ -103,7 +114,9 @@ class Quarks:
             )
             del headers["cookie"]
         try:
-            response = requests.request(method, url, headers=headers, **kwargs)
+            response = requests.request(
+                method, url, headers=headers, hooks={"response": log_response}, **kwargs
+            )
             # print(f"{response.text}")
             # response.raise_for_status()  # 检查请求是否成功，但返回非200也会抛出异常
             return response
@@ -811,6 +824,7 @@ def do_save(account, tasklist=[]):
         add_notify(f"保存路径: {task['savepath']}")
         account.do_save_task(task)
         account.do_rename_task(task)
+        time.sleep(5)
 
     return NOTIFYS
 
@@ -818,58 +832,28 @@ def do_save(account, tasklist=[]):
 def do_save_subs(account):
     update_list = account.subscribe_update_list()
 
-    save_list = []
-    update_files = 0
-
     def filter_condition(obj):
         return obj.get("save_as_status") != 1
 
+    tasks = []
     for item in update_list:
         pwd_id = item["pwd_id"]
-        stoken = item["stoken"]
+        fid = item["first_fid"]
         filtered_objects = list(filter(filter_condition, item["update_files"]))
-        index = 0
-        for file in filtered_objects:
-            index += 1
-            fid = file["fid"]
-            share_fid_token = file["share_fid_token"]
-            sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
-            pdir_fid = sharepage_dir["pdir_fid"]
-            is_root = sharepage_dir["dir"]["pdir_fid"]
-            if is_root == "0":
-                dir_paths = [f"/电影/Telegram/{item['title']}"]
-                dir_paths_exist_arr = account.get_fids(dir_paths)
-                dir_paths_exist = [item["file_path"] for item in dir_paths_exist_arr]
-                dir_paths_unexist = list(
-                    set(dir_paths) - set(dir_paths_exist) - set(["/"])
-                )
-                for dir_path in dir_paths_unexist:
-                    mkdir_return = account.mkdir(dir_path)
-                    if mkdir_return["code"] == 0:
-                        new_dir = mkdir_return["data"]
-                        dir_paths_exist_arr.append(
-                            {"file_path": dir_path, "fid": new_dir["fid"]}
-                        )
-                        print(f"创建文件夹：{dir_path}")
-                    else:
-                        print(f"创建文件夹：{dir_path} 失败, {mkdir_return['message']}")
-                # 储存目标目录的fid
-                for dir_path in dir_paths_exist_arr:
-                    pdir_fid = dir_path["fid"]
+        if len(filtered_objects) == 0:
+            continue
 
-            save_result = account.save_sharepage(
-                pdir_fid, pwd_id, fid, stoken, share_fid_token
-            )
-            if save_result:
-                if f"📂{item['title']}" not in save_list:
-                    print(f"📂{item['title']}")
-                    save_list.append(f"📂{item['title']}")
-                save_item = f'├──{file["file_name"]}'
-                if index == len(filtered_objects):
-                    save_item = f'└──{file["file_name"]}'
-                save_list.append(save_item)
-                update_files += 1
-    result = [f"📢更新文件数量：{update_files}"]
-    result.extend(save_list)
-    print(result)
-    return result
+        sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
+        savepath = (path["file_name"] for path in sharepage_dir["dir"]["full_path"])
+        savepath = "/" + "/".join(savepath)
+        tasks.append(
+            {
+                "taskname": item["title"],
+                "shareurl": item["share_url"],
+                "savepath": savepath,
+                "pattern": "",
+                "replace": "",
+                "enddate": "2099-01-30",
+            }
+        )   
+    return do_save(account, tasks)
