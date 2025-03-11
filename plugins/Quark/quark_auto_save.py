@@ -819,8 +819,7 @@ def do_save_subs(account):
     update_list = account.subscribe_update_list()
 
     tree = Tree()
-    tree.create_node(f"订阅更新", "root")
-    save_list = []
+    save_list = ["订阅更新"]
     for item in update_list:
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
@@ -858,10 +857,9 @@ def do_save_subs(account):
                 pdir_fid, pwd_id, fid, stoken, share_fid_token
             )
             if save_result:
-                if not tree.contains(pwd_id):
-                    tree.create_node(f"📂{item['title']}", pwd_id, parent="root")
-                tree.create_node(file["file_name"], fid, parent=pwd_id)
-                save_list.append(save_result)
+                if f"📂{item['title']}" not in save_list:
+                    save_list.append(f"📂{item['title']}")
+                save_list.append(f"--{file["file_name"]}")
             time.sleep(3)
     msg = tree.show(stdout=False)
     result = [f"📢更新文件数量：{len(save_list)}", msg]
