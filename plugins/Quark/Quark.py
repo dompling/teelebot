@@ -241,7 +241,7 @@ def Quark(bot, message):
     
     if save_path:
         savepath = save_path["content"]
-    if cookie:    
+    if cookies:
         cookie = cookies["content"]
     
     account = Quarks(cookie, 0)

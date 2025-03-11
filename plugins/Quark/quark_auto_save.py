@@ -818,22 +818,26 @@ def do_save(account, tasklist=[]):
 def do_save_subs(account):
     update_list = account.subscribe_update_list()
 
-    tree = Tree()
-    save_list = ["订阅更新"]
+    save_list = []
+    update_files = 0
+
+    def filter_condition(obj):
+        return obj.get("save_as_status") != 1
+
     for item in update_list:
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
-        print(f"📂{item['title']}")
-        for file in item["update_files"]:
-            if file["save_as_status"] == 1:
-                continue
+        filtered_objects = list(filter(filter_condition, item["update_files"]))
+        index = 0
+        for file in filtered_objects:
+            index += 1
             fid = file["fid"]
             share_fid_token = file["share_fid_token"]
             sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
             pdir_fid = sharepage_dir["pdir_fid"]
             is_root = sharepage_dir["dir"]["pdir_fid"]
             if is_root == "0":
-                dir_paths = [f"/电影/{item['title']}"]
+                dir_paths = [f"/电影/Telegram/{item['title']}"]
                 dir_paths_exist_arr = account.get_fids(dir_paths)
                 dir_paths_exist = [item["file_path"] for item in dir_paths_exist_arr]
                 dir_paths_unexist = list(
@@ -858,10 +862,14 @@ def do_save_subs(account):
             )
             if save_result:
                 if f"📂{item['title']}" not in save_list:
+                    print(f"📂{item['title']}")
                     save_list.append(f"📂{item['title']}")
-                save_list.append(f"——{file["file_name"]}")
-            time.sleep(3)
-    msg = tree.show(stdout=False)
-    result = [f"📢更新文件数量：{len(save_list)}", msg]
-    print("📢", msg)
+                save_item = f'├──{file["file_name"]}'
+                if index == len(filtered_objects):
+                    save_item = f'└──{file["file_name"]}'
+                save_list.append(save_item)
+                update_files += 1
+    result = [f"📢更新文件数量：{update_files}"]
+    result.extend(save_list)
+    print("📢", result)
     return result
