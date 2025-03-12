@@ -812,7 +812,6 @@ def do_sign(account):
 
 
 def do_save(account, tasklist=[]):
-    add_notify(f"<b>转存账号</b>: {account.nickname}")
     # 获取全部保存目录fid
     account.update_savepath_fid(tasklist)
     # 执行任务
