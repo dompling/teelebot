@@ -24,7 +24,7 @@ logging.basicConfig(
 
 # 定义钩子函数
 def log_response(response, *args, **kwargs):
-    logging.info(f"Request URL:{response.request.method} {response.request.url}\n\n")
+    logging.info(f"\nRequest URL:[{response.request.method}] {response.request.url}\n")
 
 
 CONFIG_DATA = {}
@@ -415,20 +415,19 @@ class Quarks:
         response = self._send_request("GET", url, params=querystring).json()
         return response["data"]
 
-    def save_sharepage(self, pdir_fid, pwd_id, fid, stoken, share_fid_token):
+    def save_sharepage(
+        self, to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
+    ):
         url = f"{self.BASE_URL}/1/clouddrive/share/sharepage/save"
         querystring = {"pr": "ucpro", "fr": "pc", "uc_param_str": ""}
         payload = {
-            "scene": "",
-            "page_original": "",
-            "to_pdir_fid": pdir_fid,
             "pwd_id": pwd_id,
             "stoken": stoken,
-            "pdir_fid": "",
-            "save_all": False,
-            "fid_list": [fid],
-            "fid_token_list": [share_fid_token],
+            "fid_list": fid_list,
+            "fid_token_list": fid_token_list,
             "mode": "inc_single",
+            "pdir_fid": pdir_fid,
+            "to_pdir_fid": to_pdir_fid,
         }
 
         response = self._send_request(
@@ -835,28 +834,40 @@ def do_save_subs(account):
     def filter_condition(obj):
         return obj.get("save_as_status") != 1
 
-    tasks = []
+    msg = []
+    count_update_files = 0
     for item in update_list:
         pwd_id = item["pwd_id"]
-        fid = item["first_fid"]
+        stoken = item["stoken"]
         filtered_objects = list(filter(filter_condition, item["update_files"]))
-        if len(filtered_objects) == 0:
+        count_filtered_objects= len(filtered_objects)
+        if count_filtered_objects == 0:
             continue
+        count_update_files += count_filtered_objects
+        for index,file in enumerate(filtered_objects):
+            fid_list = [file["fid"]]
+            fid_token_list = [file["share_fid_token"]]
 
-        sharepage_dir = account.get_sharepage_dir(pwd_id, fid)
-        savepath = (path["file_name"] for path in sharepage_dir["dir"]["full_path"])
-        savepath = "/" + "/".join(savepath)
-        tasks.append(
-            {
-                "taskname": item["title"],
-                "shareurl": item["share_url"],
-                "savepath": savepath,
-                "pattern": "",
-                "replace": "",
-                "enddate": "2099-01-30",
-            }
-        )
-    msg = ["📢订阅内容暂无更新"]
-    if len(tasks) == 0:
-        return msg
-    return do_save(account, tasks)
+            sharepage_dir = account.get_sharepage_dir(pwd_id, file["fid"])
+            pdir_fid = sharepage_dir["dir"]["pdir_fid"]
+            to_pdir_fid = sharepage_dir["dir"]["fid"]
+
+            savepath = (path["file_name"] for path in sharepage_dir["dir"]["full_path"])
+            savepath = "/" + "/".join(savepath)
+
+            result = account.save_sharepage(
+                to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
+            )
+            if result:
+                if f"📂{savepath}" not in msg:
+                    msg.append(f"📂{savepath}")
+                file_name=f"├──{file['file_name']}"
+                if index+1 == len(filtered_objects):
+                    file_name=f"└──{file['file_name']}"
+                msg.append(file_name)
+
+    if count_update_files==0:
+        msg = ["📢订阅内容暂无更新"]
+    else:
+        msg.insert(0,f"<b>📢订阅更新数量：<b>{count_update_files}")    
+    return msg
