@@ -415,15 +415,6 @@ def Quark(bot, message):
             )
             return bot.message_deletor(5, chat_id, status["message_id"])
 
-        if not verify_account(account):
-            status = bot.sendMessage(
-                chat_id=message["chat"]["id"],
-                text="🚫Cookie访问频繁，请更换或者稍后再试",
-                parse_mode="HTML",
-                reply_to_message_id=message_id,
-            )
-            return bot.message_deletor(20, chat_id, status["message_id"])
-
         task = {
             "taskname": "夸克机器人保存任务",
             "shareurl": uri,
