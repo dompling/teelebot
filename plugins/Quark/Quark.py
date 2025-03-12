@@ -263,35 +263,31 @@ def Quark(bot, message):
         bot.message_deletor(gap, message["chat"]["id"], message_id)
 
         if text == prefix:
-            if verify_account(account):
-                notify_body = [
-                    f"转存账号：{account.nickname}",
-                    f"保存路径：{savepath}",
-                    f"使用命令：",
-                    "<b>/qk</b> - 帮助",
-                    "<b>/qkset</b> - 设置 Cookie",
-                    "<b>/qkadmin</b> - 设置管理",
-                    "<b>/qkpath</b> - 设置账号",
-                    "<b>/qksign</b> - 签到",
-                    "<b>/qksub</b> - 更新订阅链接",
-                ]
-                notify_body = "\n".join(notify_body)
-                notify_body += (
-                    "\n<b>/qksub</b> - 命令+周期，定期更新\n<b>支持的周期指令：</b> \n\n"
-                    + "<b>1s 2s 5s 10s 15s 30s 45s \n"
-                    + "1m 2m 5m 10m 15m 30m 45m \n"
-                    + "1h 2h 4h 6h 8h 10h 12h \n"
-                    + "1d 3d 5d 7d 10d 15d 20d 30d"
-                    + "</b>"
-                )
-                status = bot.sendMessage(
-                    text=notify_body,
-                    chat_id=chat_id,
-                    parse_mode="HTML",
-                    reply_to_message_id=message_id,
-                )
-                return bot.message_deletor(60, chat_id, status["message_id"])
-
+            notify_body = [
+                f"使用命令：",
+                "<b>/qk</b> - 帮助",
+                "<b>/qkset</b> - 设置 Cookie",
+                "<b>/qkadmin</b> - 设置管理",
+                "<b>/qkpath</b> - 设置账号",
+                "<b>/qksign</b> - 签到",
+                "<b>/qksub</b> - 更新订阅链接",
+            ]
+            notify_body = "\n".join(notify_body)
+            notify_body += (
+                "\n<b>/qksub</b> - 命令+周期，定期更新\n<b>支持的周期指令：</b> \n\n"
+                + "<b>1s 2s 5s 10s 15s 30s 45s \n"
+                + "1m 2m 5m 10m 15m 30m 45m \n"
+                + "1h 2h 4h 6h 8h 10h 12h \n"
+                + "1d 3d 5d 7d 10d 15d 20d 30d"
+                + "</b>"
+            )
+            status = bot.sendMessage(
+                text=notify_body,
+                chat_id=chat_id,
+                parse_mode="HTML",
+                reply_to_message_id=message_id,
+            )
+            return bot.message_deletor(60, chat_id, status["message_id"])
         if text[: len(prefix + "subl")] == prefix + "subl":
             msg = ""
             if not schedule_info:
@@ -356,9 +352,7 @@ def Quark(bot, message):
                     )
                     return
 
-            send_sub_msg(
-                bot=bot, chat_id=chat_id, message_id=message_id, account=account
-            )
+            send_sub_msg(bot=bot, chat_id=chat_id, account=account)
 
         elif text[: len(prefix + "sign")] == prefix + "sign":
             notify_body = do_sign(account)
@@ -532,31 +526,24 @@ def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
         bot.message_deletor(5, chat_id, status["message_id"])
 
 
-def send_sub_msg(bot, chat_id, message_id, account, gap_key=False):
-    if not verify_account(account):
-        status = bot.sendMessage(
+def send_sub_msg(bot, chat_id, account, gap_key=False):
+    try:
+        notify_body = do_save_subs(account)
+
+        if gap_key:
+            timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+            notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
+            notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
+
+        notify_body = "\n".join(notify_body)
+        print(notify_body)
+        bot.sendMessage(
             chat_id=chat_id,
-            text="🚫Cookie访问频繁，请更换或者稍后再试",
+            text=notify_body,
             parse_mode="HTML",
-            reply_to_message_id=message_id,
         )
-        return bot.message_deletor(20, chat_id, status["message_id"])
-
-    notify_body = do_save_subs(account)
-
-    if gap_key:
-        timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-        notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
-        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
-
-    notify_body = "\n".join(notify_body)
-    print(notify_body)
-    bot.sendMessage(
-        chat_id=chat_id,
-        text=notify_body,
-        parse_mode="HTML",
-        reply_to_message_id=message_id,
-    )
+    except:
+        return False
 
 
 def run_schedule(
@@ -572,9 +559,7 @@ def run_schedule(
     )
     if schedule_info:
         bot.schedule.delete(schedule_info["uid"])
-    ok, uid = bot.schedule.add(
-        gap, send_sub_msg, (bot, chat_id, message_id, account, gap_key)
-    )
+    ok, uid = bot.schedule.add(gap, send_sub_msg, (bot, chat_id, account, gap_key))
     timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
     if ok:
         msg = (
@@ -602,7 +587,12 @@ def run_schedule(
     db.insert_or_update(
         user_id,
         json.dumps(
-            {"gap_key": gap_orign_key, "chat_id": chat_id, "uid": uid, "time": timestamp}
+            {
+                "gap_key": gap_orign_key,
+                "chat_id": chat_id,
+                "uid": uid,
+                "time": timestamp,
+            }
         ),
         "schedule",
     )
