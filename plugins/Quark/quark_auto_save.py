@@ -869,5 +869,5 @@ def do_save_subs(account):
     if count_update_files==0:
         msg = ["📢订阅内容暂无更新"]
     else:
-        msg.insert(0,f"<b>📢订阅更新数量：<b>{count_update_files}")    
+        msg.insert(0,f"<b>📢订阅更新数量：</b>{count_update_files}")    
     return msg
