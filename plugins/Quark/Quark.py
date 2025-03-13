@@ -521,31 +521,21 @@ def send_sub_msg(bot, chat_id, account, gap_key=False):
     notify_body = []
     try:
         notify_body = do_save_subs(account)
-
-        if gap_key:
-            timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-            notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
-            notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
-
-        notify_body = "\n".join(notify_body)
-        print(notify_body)
-        bot.sendMessage(
-            chat_id=chat_id,
-            text=notify_body,
-            parse_mode="HTML",
-        )
     except Exception as e:
         notify_body = [f"❌❌订阅更新异常：{e}"]
-        if gap_key:
-            timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-            notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
-            notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
 
-        bot.sendMessage(
-            chat_id=chat_id,
-            text=notify_body,
-            parse_mode="HTML",
-        )
+    if gap_key:
+        timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
+        notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
+        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
+
+    notify_body = "\n".join(notify_body)
+    print(notify_body)
+    bot.sendMessage(
+        chat_id=chat_id,
+        text=notify_body,
+        parse_mode="HTML",
+    )
 
 
 def run_schedule(
