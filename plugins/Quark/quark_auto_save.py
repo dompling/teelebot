@@ -827,7 +827,7 @@ def do_save(account, tasklist=[]):
     return NOTIFYS
 
 
-def do_save_subs(account):
+def do_save_subs(account: Quarks):
     update_list = account.subscribe_update_list()
 
     def filter_condition(obj):
@@ -839,11 +839,11 @@ def do_save_subs(account):
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
         filtered_objects = list(filter(filter_condition, item["update_files"]))
-        count_filtered_objects= len(filtered_objects)
+        count_filtered_objects = len(filtered_objects)
         if count_filtered_objects == 0:
             continue
         count_update_files += count_filtered_objects
-        for index,file in enumerate(filtered_objects):
+        for index, file in enumerate(filtered_objects):
             fid_list = [file["fid"]]
             fid_token_list = [file["share_fid_token"]]
 
@@ -857,16 +857,27 @@ def do_save_subs(account):
             result = account.save_sharepage(
                 to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
             )
+
             if result:
                 if f"📂{savepath}" not in msg:
                     msg.append(f"📂{savepath}")
-                file_name=f"├──{file['file_name']}"
-                if index+1 == len(filtered_objects):
-                    file_name=f"└──{file['file_name']}"
+                file_name = file['file_name']
+                pattern = re.compile(r"^\d+(?:\s|_)?(4k)?\..*$")
+                if pattern.match(file["file_name"]):
+                    file_name = f'{item["title"]} {file["file_name"]}'
+                    account.rename(
+                        result["task_resp"]["data"]["save_as"]["save_as_top_fids"][0],
+                        file_name,
+                    )
+                
+                if index + 1 == len(filtered_objects):
+                    file_name = f"└──{file_name}"
+                else:
+                    file_name = f"├──{file_name}"
                 msg.append(file_name)
-
-    if count_update_files==0:
+                
+    if count_update_files == 0:
         msg = ["📢订阅内容暂无更新"]
     else:
-        msg.insert(0,f"<b>📢订阅更新数量：</b>{count_update_files}")    
+        msg.insert(0, f"<b>📢订阅更新数量：</b>{count_update_files}")
     return msg
