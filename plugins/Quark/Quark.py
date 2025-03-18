@@ -299,7 +299,6 @@ def Quark(bot, message):
                 chat_id=message["chat"]["id"],
                 text=notify_body,
                 parse_mode="HTML",
-                reply_to_message_id=message_id,
             )
 
         elif text[: len(prefix + "set")] == prefix + "set":
@@ -368,7 +367,6 @@ def Quark(bot, message):
             chat_id=message["chat"]["id"],
             text=notify_body,
             parse_mode="HTML",
-            reply_to_message_id=message_id,
         )
 
 
