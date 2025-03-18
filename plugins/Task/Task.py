@@ -332,7 +332,6 @@ def Task(bot, message):
                 + str(result["size"])
                 + "</code>\n\n"
             )
-            bot.schedule.clear()
             taskList = db.select(user_id, "task")
             if taskList:
                 for task in taskList:
