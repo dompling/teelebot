@@ -240,17 +240,16 @@ def Task(bot, message):
     elif text[: len(prefix + "del")] == prefix + "del":
         if len(text.split(" ")) == 2:
             msg = ""
-            uid = str(text.split(" ")[1])
-            ok, uid = bot.schedule.delete(uid)
+            _uid = str(text.split(" ")[1])
+            ok, uid = bot.schedule.delete(_uid)
             if ok:
                 msg = "<b>移除了任务 " + str(uid) + "</b>"
                 taskList = db.select(user_id, "task")
                 if taskList:
                     for task in taskList:
                         task_content = json.loads(task["content"])
-                        uid = task_content["uid"]
-                        if task_content["commond"] == msg_content:
-                            db.delete_id(task_content["id"])
+                        if task_content["uid"] == uid:
+                            db.delete_id(task["id"])
             else:
                 if uid == "Empty":
                     msg = "<b>队列为空</b>"

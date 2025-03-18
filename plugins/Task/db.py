@@ -7,7 +7,7 @@ class SqliteDB(object):
         Open the connection
         """
         self.conn = sqlite3.connect(
-            bot.path_converter(plugin_dir + "Quark/data.db"), check_same_thread=False
+            bot.path_converter(plugin_dir + "Task/data.db"), check_same_thread=False
         )  # 只读模式加上uri=True
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
@@ -120,7 +120,7 @@ class SqliteDB(object):
         """
         Delete
         """
-        self.cursor.execute("DELETE FROM data WHERE id=?", (id))
+        self.cursor.execute("DELETE FROM data WHERE id=?", (int(id),))
 
         if self.cursor.rowcount == 1:
             return True
