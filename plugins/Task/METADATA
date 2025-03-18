@@ -1,0 +1,14 @@
+Metadata-version: 1.1
+Plugin-name: Task
+Command: /task
+Buffer-permissions: False:False
+Version: 1.2.0
+Summary: 周期性执行特定任务，支持文本类消息，插件命令
+Home-page: https://github.com/dompling/teelebot
+Author: Pluto (github.com/plutobell)
+Author-email: hi#ojoll.com (#==@)
+License: GPLv3
+Keywords: Task, 周期性任务, 执行插件命令
+Requires-teelebot: >=2.3.0
+Requires-dist: 
+Source: https://github.com/dompling/teelebot-plugins
