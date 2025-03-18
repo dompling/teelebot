@@ -788,7 +788,7 @@ def do_sign(account):
         if growth_info["cap_sign"]["sign_daily"]:
             sign_message = f"📅 签到记录: 今日已签到+{int(growth_info['cap_sign']['sign_daily_reward']/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']}/{growth_info['cap_sign']['sign_target']})✅"
             message = f"{sign_message}\n{growth_message}"
-            print(message)
+            add_notify(message)
         else:
             sign, sign_return = account.get_growth_sign()
             if sign:
@@ -807,7 +807,6 @@ def do_sign(account):
                     add_notify(message)
             else:
                 print(f"📅 签到异常: {sign_return}")
-
     return NOTIFYS
 
 
