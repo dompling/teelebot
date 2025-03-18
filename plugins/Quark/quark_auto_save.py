@@ -777,6 +777,8 @@ def format_bytes(size_bytes: int) -> str:
 
 
 def do_sign(account):
+    global NOTIFYS
+    NOTIFYS = []
     if not account.mparam:
         print("⏭️ 移动端参数未设置，跳过签到")
         print()
@@ -788,7 +790,7 @@ def do_sign(account):
         if growth_info["cap_sign"]["sign_daily"]:
             sign_message = f"📅 签到记录: 今日已签到+{int(growth_info['cap_sign']['sign_daily_reward']/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']}/{growth_info['cap_sign']['sign_target']})✅"
             message = f"{sign_message}\n{growth_message}"
-            add_notify(message)
+            print(sign_message)
         else:
             sign, sign_return = account.get_growth_sign()
             if sign:
@@ -811,6 +813,8 @@ def do_sign(account):
 
 
 def do_save(account, tasklist=[]):
+    global NOTIFYS
+    NOTIFYS = []
     # 获取全部保存目录fid
     account.update_savepath_fid(tasklist)
     # 执行任务

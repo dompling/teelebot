@@ -92,6 +92,10 @@ def Task(bot, message):
             + "1d 3d 5d 7d 10d 15d 20d 30d"
             + "</i>"
         )
+        status = bot.sendMessage(
+            chat_id=chat_id, text=msg, parse_mode="HTML", reply_to_message_id=message_id
+        )
+        bot.message_deletor(60, status["chat"]["id"], status["message_id"])
         bot.schedule.clear()
         taskList = db.select(user_id, "task")
         task_msg = False
@@ -118,10 +122,6 @@ def Task(bot, message):
                 db.update_id(task["id"], json.dumps(task_content))
                 task_msg += f"<b>{task_content['commond']}</b>：{uid} {task_content['gap_key']}\n"
 
-        status = bot.sendMessage(
-            chat_id=chat_id, text=msg, parse_mode="HTML", reply_to_message_id=message_id
-        )
-        bot.message_deletor(60, status["chat"]["id"], status["message_id"])
         if task_msg:
             status = bot.sendMessage(
                 chat_id=chat_id,
@@ -352,7 +352,6 @@ def event(bot, chat_id, msg_content, msg, message, parse_mode):
         if value and msg_content.startswith(value):
             commond = msg_content
             break
-
     if commond:
         message["text"] = commond
         bot._pluginRun(bot, message)
