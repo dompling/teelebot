@@ -94,6 +94,7 @@ def Task(bot, message):
         )
         bot.schedule.clear()
         taskList = db.select(user_id, "task")
+        task_msg = False
         if taskList:
             task_msg = "<b>初始化任务</b>\n\n"
             for task in taskList:
