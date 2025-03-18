@@ -4,7 +4,7 @@ creation time: 2020-11-11
 last_modify: 2023-05-12
 """
 import time, json
-from plugins.Task.db import SqliteDB
+from .db import SqliteDB
 
 
 def Task(bot, message):
