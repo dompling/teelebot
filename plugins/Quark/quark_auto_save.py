@@ -861,7 +861,7 @@ def do_save_subs(account: Quarks):
                 to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
             )
             query_task_return = account.query_task(result['task_id'])
-            print(query_task_return)
+            
             if query_task_return["code"]==200:
                 if f"📂{savepath}" not in msg:
                     msg.append(f"📂{savepath}")
