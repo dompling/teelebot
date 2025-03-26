@@ -860,12 +860,12 @@ def do_save_subs(account: Quarks):
             result = account.save_sharepage(
                 to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
             )
-            query_task_return = account.query_task(result['task_id'])
-            
-            if query_task_return["code"]==200:
+            query_task_return = account.query_task(result["task_id"])
+
+            if query_task_return["code"] == 0:
                 if f"📂{savepath}" not in msg:
                     msg.append(f"📂{savepath}")
-                file_name = file['file_name']
+                file_name = file["file_name"]
                 pattern = re.compile(r"^\d+(?:\s|_)?(4k)?\..*$")
                 if pattern.match(file["file_name"]):
                     file_name = f'{item["title"]} {file["file_name"]}'
@@ -873,7 +873,7 @@ def do_save_subs(account: Quarks):
                         result["task_resp"]["data"]["save_as"]["save_as_top_fids"][0],
                         file_name,
                     )
-                
+
                 if index + 1 == len(filtered_objects):
                     file_name = f"└──{file_name}"
                 else:
