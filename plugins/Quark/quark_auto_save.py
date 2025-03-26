@@ -860,8 +860,9 @@ def do_save_subs(account: Quarks):
             result = account.save_sharepage(
                 to_pdir_fid, pdir_fid, pwd_id, fid_list, stoken, fid_token_list
             )
-
-            if result:
+            query_task_return = account.query_task(result['task_id'])
+            print(query_task_return)
+            if query_task_return["code"]==200:
                 if f"📂{savepath}" not in msg:
                     msg.append(f"📂{savepath}")
                 file_name = file['file_name']
@@ -878,7 +879,8 @@ def do_save_subs(account: Quarks):
                 else:
                     file_name = f"├──{file_name}"
                 msg.append(file_name)
-                
+            else:
+                msg.append(query_task_return["message"])
     if count_update_files == 0:
         msg = ["📢订阅内容暂无更新"]
     else:

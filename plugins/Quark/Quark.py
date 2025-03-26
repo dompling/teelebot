@@ -290,7 +290,26 @@ def Quark(bot, message):
             return bot.message_deletor(60, chat_id, status["message_id"])
 
         elif text[: len(prefix + "sub")] == prefix + "sub":
-            send_sub_msg(bot=bot, chat_id=chat_id, account=account)
+            notify_body = []
+            try:
+                notify_body = do_save_subs(account)
+            except Exception as e:
+                notify_body = [f"❌❌订阅更新异常：{e}"]
+
+            if message.get("action") == "cron":
+                timestamp = time.strftime(
+                    "%Y/%m/%d %H:%M:%S", time.localtime(time.time())
+                )
+                notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
+                notify_body.insert(0, f"<b>⏰ 定时任务</b>\n")
+
+            notify_body = "\n".join(notify_body)
+            print(notify_body)
+            bot.sendMessage(
+                chat_id=chat_id,
+                text=notify_body,
+                parse_mode="HTML",
+            )
 
         elif text[: len(prefix + "sign")] == prefix + "sign":
             notify_body = do_sign(account)
@@ -451,24 +470,3 @@ def handle_admin_commands(bot, message, db: SqliteDB, super_admin: bool):
             reply_to_message_id=message_id,
         )
         bot.message_deletor(5, chat_id, status["message_id"])
-
-
-def send_sub_msg(bot, chat_id, account, gap_key=False):
-    notify_body = []
-    try:
-        notify_body = do_save_subs(account)
-    except Exception as e:
-        notify_body = [f"❌❌订阅更新异常：{e}"]
-
-    if gap_key:
-        timestamp = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(time.time()))
-        notify_body.insert(0, f"<b>时间：</b>{timestamp}\n")
-        notify_body.insert(0, f"<b>⏰ 定时任务：周期{gap_key}</b>\n")
-
-    notify_body = "\n".join(notify_body)
-    print(notify_body)
-    bot.sendMessage(
-        chat_id=chat_id,
-        text=notify_body,
-        parse_mode="HTML",
-    )

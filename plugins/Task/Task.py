@@ -353,6 +353,7 @@ def event(bot, chat_id, msg_content, msg, message, parse_mode):
             break
     if commond:
         message["text"] = commond
+        message["action"] = "cron"
         bot._pluginRun(bot, message)
     else:
         status = bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
