@@ -238,9 +238,7 @@ def Quark(bot, message):
 
     save_path = db.find(user_id=user_id, type=data_db_type["path"])
     cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
-    schedule_item = db.find(user_id=user_id, type="schedule")
-
-    schedule_info = False
+   
     savepath = False
     cookie = False
 
@@ -248,9 +246,6 @@ def Quark(bot, message):
         savepath = save_path["content"]
     if cookies:
         cookie = cookies["content"]
-
-    if schedule_item:
-        schedule_info = json.loads(schedule_item["content"])
 
     account = Quarks(cookie, 0)
     if text[: len(prefix)] == prefix:

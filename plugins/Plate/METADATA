@@ -8,7 +8,7 @@ Home-page: https://github.com/plutobell/teelebot
 Author: Pluto (github.com/plutobell)
 Author-email: hi#ojoll.com (#==@)
 License: GPLv3
-Keywords: Plate
+Keywords: /wp
 Requires-teelebot: >=2.3.0
-Requires-dist: 
+Requires-dist: p115client
 Source: https://github.com/plutobell/teelebot-plugins

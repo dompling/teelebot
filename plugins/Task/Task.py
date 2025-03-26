@@ -347,10 +347,13 @@ def Task(bot, message):
 
 def event(bot, chat_id, msg_content, msg, message, parse_mode):
     commond = False
-    for key, value in bot.plugin_bridge.items():
-        if value and msg_content.startswith(value):
-            commond = msg_content
-            break
+    for plugin, v in bot.plugin_bridge.items():
+        is_read, metadata_info = bot.metadata.read(plugin)
+        if is_read:
+            task_value = metadata_info["Keywords"]
+            if task_value and msg_content.startswith(task_value):
+                commond = msg_content
+                break
     if commond:
         message["text"] = commond
         message["action"] = "cron"
