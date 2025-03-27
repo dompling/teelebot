@@ -3,7 +3,7 @@
 creation time: 2020-11-11
 last_modify: 2023-05-12
 """
-import time, json
+import time, json, re
 from .db import SqliteDB
 
 
@@ -76,7 +76,7 @@ def Task(bot, message):
         msg = (
             "<b>Task 插件功能</b>"
             + "\n\n"
-            + "<b>/taskadd</b> 添加任务 格式：指令+空格+周期+消息"
+            + "<b>/taskadd</b> 添加任务 格式：指令+空格+周期+消息（文本｜命令：参数）"
             + "\n"
             + "<b>/taskdel</b> 移除任务 格式：指令+空格+标识"
             + "\n"
@@ -347,13 +347,11 @@ def Task(bot, message):
 
 def event(bot, chat_id, msg_content, msg, message, parse_mode):
     commond = False
-    for plugin, v in bot.plugin_bridge.items():
-        is_read, metadata_info = bot.metadata.read(plugin)
-        if is_read:
-            task_value = metadata_info["Keywords"]
-            if task_value and msg_content.startswith(task_value):
-                commond = msg_content
-                break
+    pattern = r"^(/[a-zA-Z]+)(:.*)?"
+    matches = re.match(pattern, msg_content)
+    if matches:
+        commond = matches.group().replace(":", " ")
+
     if commond:
         message["text"] = commond
         message["action"] = "cron"
