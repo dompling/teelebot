@@ -197,7 +197,6 @@ def Quark(bot, message):
     _, __, ___, uri = account.get_id_from_url(json.dumps(message, ensure_ascii=False))
 
     if uri:
-
         if not cookies:
             status = bot.sendMessage(
                 chat_id=message["chat"]["id"],
@@ -222,13 +221,15 @@ def Quark(bot, message):
             "replace": "",
             "enddate": "2099-01-30",
         }
-        
+
         ____, rename = message.get("text").split(" ")
         if rename:
             task["taskname"] = rename
             task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
             task["replace"] = "$TASKNAME \\1"
             task["savepath"] = f"{savepath}/{rename}"
+
+        db.insert(user_id, json.dumps(task), "task")
 
         notify_body = do_save(account, [task])
         notify_body = "\n".join(notify_body)
