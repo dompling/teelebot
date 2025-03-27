@@ -222,12 +222,13 @@ def Quark(bot, message):
             "enddate": "2099-01-30",
         }
 
-        ____, rename = message.get("text").split(" ")
-        if rename:
-            task["taskname"] = rename
-            task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
-            task["replace"] = "$TASKNAME \\1"
-            task["savepath"] = f"{savepath}/{rename}"
+        if message.get("text"):
+            ____, rename = message.get("text").split(" ")
+            if rename:
+                task["taskname"] = rename
+                task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
+                task["replace"] = "$TASKNAME \\1"
+                task["savepath"] = f"{savepath}/{rename}"
 
         db.insert(user_id, json.dumps(task), "task")
 
