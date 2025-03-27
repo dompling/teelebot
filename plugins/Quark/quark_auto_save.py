@@ -463,14 +463,13 @@ class Quarks:
         return pattern, replace
 
     def get_id_from_url(self, url):
-        url = url.replace("https://pan.quark.cn/s/", "")
-        pattern = r"(\w+)(\?pwd=(\w+))?(#/list/share.*/(\w+))?"
+        pattern = r"https:\/\/pan\.quark\.cn\/s\/(\w+)(\?pwd=(\w+))?(#\/list\/share.*\/(\w{32}))?"
         match = re.search(pattern, url)
         if match:
             pwd_id = match.group(1)
             passcode = match.group(3) if match.group(3) else ""
             pdir_fid = match.group(5) if match.group(5) else 0
-            return pwd_id, passcode, pdir_fid
+            return pwd_id, passcode, pdir_fid, match.group()
         else:
             return None
 
@@ -507,7 +506,7 @@ class Quarks:
 
     def do_save_check(self, shareurl, savepath):
         try:
-            pwd_id, passcode, pdir_fid = self.get_id_from_url(shareurl)
+            pwd_id, passcode, pdir_fid, _ = self.get_id_from_url(shareurl)
             is_sharing, stoken = self.get_stoken(pwd_id, passcode)
             share_file_list = self.get_detail(pwd_id, stoken, pdir_fid)["list"]
             fid_list = [item["fid"] for item in share_file_list]
@@ -553,10 +552,9 @@ class Quarks:
         if task.get("shareurl_ban"):
             print(f"《{task['taskname']}》：{task['shareurl_ban']}")
             return
-
         # 链接转换所需参数
-        pwd_id, passcode, pdir_fid = self.get_id_from_url(task["shareurl"])
-        # print("match: ", pwd_id, pdir_fid)
+        pwd_id, passcode, pdir_fid, _ = self.get_id_from_url(task["shareurl"])
+        print("match: ", pwd_id, pdir_fid)
 
         # 获取stoken，同时可验证资源是否失效
         is_sharing, stoken = self.get_stoken(pwd_id, passcode)
@@ -625,6 +623,8 @@ class Quarks:
                 pattern, replace = self.magic_regex_func(
                     task["pattern"], task["replace"], task["taskname"]
                 )
+            pattern = ""
+            replace = ""
             # 正则文件名匹配
             if re.search(pattern, share_file["file_name"]):
                 # 替换后的文件名
@@ -824,9 +824,6 @@ def do_save(account, tasklist=[]):
         add_notify(f"<b>保存路径</b>: {task['savepath']}")
         account.do_save_task(task)
         account.do_rename_task(task)
-        if index + 1 != len(tasklist):
-            print("📢 停止执行 3s")
-            time.sleep(3)
     return NOTIFYS
 
 

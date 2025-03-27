@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
-import os, json, re, time, sqlite3
-from .quark_auto_save import Quarks, do_save, verify_account, do_sign, do_save_subs
+import os, json, re, time
+from .quark_auto_save import Quarks, do_save, do_sign, do_save_subs
+from .db import SqliteDB
 
 data_db_type = {
     "cookie": "cookie",
@@ -44,160 +45,6 @@ gaps = {
 }
 
 
-class SqliteDB(object):
-    def __init__(self, bot, plugin_dir):
-        """
-        Open the connection
-        """
-        self.conn = sqlite3.connect(
-            bot.path_converter(plugin_dir + "Quark/data.db"), check_same_thread=False
-        )  # 只读模式加上uri=True
-        self.conn.row_factory = sqlite3.Row
-        self.cursor = self.conn.cursor()
-        self.cursor.execute(
-            "CREATE TABLE IF NOT EXISTS data (id INTEGER PRIMARY KEY autoincrement, user_id TEXT, content TEXT, type TEXT, timestamp INTEGER)"
-        )
-
-    def __del__(self):
-        """
-        Close the connection
-        """
-        self.cursor.close()
-        self.conn.commit()
-        self.conn.close()
-
-    def insert(self, user_id, content, type):
-        """
-        Insert
-        """
-        timestamp = int(time.time())
-        self.cursor.execute(
-            "INSERT INTO data (user_id, content, type, timestamp) VALUES (?,?,?,?)",
-            (user_id, content, type, timestamp),
-        )
-
-        last_inserted_id = self.cursor.lastrowid
-        if self.cursor.rowcount == 1:
-            return last_inserted_id
-        else:
-            return False
-
-    def find_type(self, type):
-        """
-        Select
-        """
-        self.cursor.execute("SELECT * FROM data WHERE type=? LIMIT 1", (type,))
-        result = self.cursor.fetchall()
-
-        if result:
-            return result[0]
-        else:
-            return False
-
-    def get_user_info(self, user_id):
-        """
-        Select
-        """
-        self.cursor.execute("SELECT * FROM data WHERE user_id=? LIMIT 1", (user_id))
-        result = self.cursor.fetchall()
-
-        if result:
-            return result[0]
-        else:
-            return False
-
-    def find(self, user_id, type):
-        """
-        Select
-        """
-        self.cursor.execute(
-            "SELECT * FROM data WHERE user_id=? and type=? LIMIT 1", (user_id, type)
-        )
-        result = self.cursor.fetchall()
-
-        if result:
-            return result[0]
-        else:
-            return False
-
-    def select(self, user_id, type):
-        """
-        Select
-        """
-        self.cursor.execute(
-            "SELECT * FROM data WHERE user_id=? and type=?", (user_id, type)
-        )
-        result = self.cursor.fetchall()
-
-        if result:
-            return result
-        else:
-            return False
-
-    def select_type_records(self, type):
-        """
-        Select
-        """
-        self.cursor.execute("SELECT * FROM data WHERE type=?", (type,))
-        result = self.cursor.fetchall()
-
-        if result:
-            return result
-        else:
-            return False
-
-    def delete(self, user_id, type):
-        """
-        Delete
-        """
-        self.cursor.execute(
-            "DELETE FROM data WHERE user_id=? and type=?", (user_id, type)
-        )
-
-        if self.cursor.rowcount == 1:
-            return True
-        else:
-            return False
-
-    def update(self, user_id, type, content):
-        """
-        Insert
-        """
-        timestamp = int(time.time())
-        self.cursor.execute(
-            "UPDATE data Set content = ?,timestamp = ? WHERE user_id=? and type=?",
-            (content, timestamp, user_id, type),
-        )
-
-        last_inserted_id = self.cursor.lastrowid
-        if self.cursor.rowcount == 1:
-            return last_inserted_id
-        else:
-            return False
-
-    def update_type(self, type, content):
-        """
-        Insert
-        """
-        timestamp = int(time.time())
-        self.cursor.execute(
-            "UPDATE data Set content = ?,timestamp = ? WHERE type=?",
-            (content, timestamp, type),
-        )
-
-        last_inserted_id = self.cursor.lastrowid
-        if self.cursor.rowcount == 1:
-            return last_inserted_id
-        else:
-            return False
-
-    def insert_or_update(self, user_id, content, type):
-        if self.find(user_id, type):
-            return self.update(user_id, type, content)
-        else:
-            return self.insert(user_id, content, type)
-
-
 def get_cookie(path):
     cookies = ""
     if os.path.exists(path):
@@ -238,7 +85,7 @@ def Quark(bot, message):
 
     save_path = db.find(user_id=user_id, type=data_db_type["path"])
     cookies = db.find(user_id=user_id, type=data_db_type["cookie"])
-   
+
     savepath = False
     cookie = False
 
@@ -347,8 +194,9 @@ def Quark(bot, message):
     ):
         return
 
-    is_quark, uri = macth_content(json.dumps(message, ensure_ascii=False))
-    if is_quark:
+    _, __, ___, uri = account.get_id_from_url(json.dumps(message, ensure_ascii=False))
+
+    if uri:
 
         if not cookies:
             status = bot.sendMessage(
@@ -374,6 +222,14 @@ def Quark(bot, message):
             "replace": "",
             "enddate": "2099-01-30",
         }
+        
+        ____, rename = message.get("text").split(" ")
+        if rename:
+            task["taskname"] = rename
+            task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
+            task["replace"] = "$TASKNAME \\1"
+            task["savepath"] = f"{savepath}/{rename}"
+
         notify_body = do_save(account, [task])
         notify_body = "\n".join(notify_body)
 
@@ -382,13 +238,6 @@ def Quark(bot, message):
             text=notify_body,
             parse_mode="HTML",
         )
-
-
-def macth_content(content):
-    path = re.search(r"https:\/\/pan\.quark\.cn\/s\/([a-z0-9]+)", content)
-    if path:
-        return True, path.group(0)
-    return False, content
 
 
 def check_user_admin(bot, message, super_admin: bool, is_admin: bool):
