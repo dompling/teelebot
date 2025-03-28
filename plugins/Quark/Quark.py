@@ -210,7 +210,7 @@ def Quark(bot, message):
 
     form_url = account.get_id_from_url(json.dumps(message, ensure_ascii=False))
 
-    if form_url[3]:
+    if form_url and len(form_url) > 2:
         uri = form_url[3]
         if not cookies:
             status = bot.sendMessage(
