@@ -834,10 +834,11 @@ def do_save_subs(account: Quarks):
     def filter_condition(obj):
         return obj.get("save_as_status") != 1
 
-    tree.create_node("/", "root")
+    tree.create_node("📢订阅更新数量：", "root")
     msg = []
     count_update_files = 0
     task = []
+    
     for item in update_list:
         task.append(item["share_url"])
         pwd_id = item["pwd_id"]
@@ -848,7 +849,6 @@ def do_save_subs(account: Quarks):
             continue
         count_update_files += count_filtered_objects
         tree.create_node(item["title"], pwd_id, "root")
-
         for index, file in enumerate(filtered_objects):
             fid_list = [file["fid"]]
             fid_token_list = [file["share_fid_token"]]
@@ -870,11 +870,8 @@ def do_save_subs(account: Quarks):
                 tree.create_node(f"📂{savepath}/{file_name}", file["fid"], pwd_id)
             else:
                 print("保存失败：", query_task_return["message"])
-    if count_update_files == 0:
-        msg = ["📢订阅内容暂无更新"]
-    else:
-        msg.insert(0, f"<b>📢订阅更新数量：</b>{count_update_files}")
 
-    if tree.size() > 1:
-        msg.append(tree.show(stdout=False))
+    tree.update_node("root", tag=f"📢订阅更新数量：{count_update_files}")
+    msg.append(tree.show(stdout=False))
+        
     return msg, task
