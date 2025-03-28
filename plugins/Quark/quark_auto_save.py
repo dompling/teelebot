@@ -829,13 +829,17 @@ def do_save(account, tasklist=[]):
 
 def do_save_subs(account: Quarks):
     update_list = account.subscribe_update_list()
+    tree = Tree()
 
     def filter_condition(obj):
         return obj.get("save_as_status") != 1
 
+    tree.create_node("/", "root")
     msg = []
     count_update_files = 0
+    task = []
     for item in update_list:
+        task.append(item["share_url"])
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
         filtered_objects = list(filter(filter_condition, item["update_files"]))
@@ -843,6 +847,8 @@ def do_save_subs(account: Quarks):
         if count_filtered_objects == 0:
             continue
         count_update_files += count_filtered_objects
+        tree.create_node(item["title"], pwd_id, "root")
+
         for index, file in enumerate(filtered_objects):
             fid_list = [file["fid"]]
             fid_token_list = [file["share_fid_token"]]
@@ -860,26 +866,15 @@ def do_save_subs(account: Quarks):
             query_task_return = account.query_task(result["task_id"])
 
             if query_task_return["code"] == 0:
-                if f"📂{savepath}" not in msg:
-                    msg.append(f"📂{savepath}")
                 file_name = file["file_name"]
-                pattern = re.compile(r"^\d+(?:\s|_)?(4k)?\..*$")
-                if pattern.match(file["file_name"]):
-                    file_name = f'{item["title"]} {file["file_name"]}'
-                    account.rename(
-                        result["task_resp"]["data"]["save_as"]["save_as_top_fids"][0],
-                        file_name,
-                    )
-
-                if index + 1 == len(filtered_objects):
-                    file_name = f"└──{file_name}"
-                else:
-                    file_name = f"├──{file_name}"
-                msg.append(file_name)
+                tree.create_node(f"📂{savepath}/{file_name}", file["fid"], pwd_id)
             else:
-                msg.append(query_task_return["message"])
+                print("保存失败：", query_task_return["message"])
     if count_update_files == 0:
         msg = ["📢订阅内容暂无更新"]
     else:
         msg.insert(0, f"<b>📢订阅更新数量：</b>{count_update_files}")
-    return msg
+
+    if tree.size() > 1:
+        msg.append(tree.show(stdout=False))
+    return msg, task

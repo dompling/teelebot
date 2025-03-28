@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
-import os, json, re, time
+import os, json, time, re
 from .quark_auto_save import Quarks, do_save, do_sign, do_save_subs
 from .db import SqliteDB
+from .config import Config
+
 
 data_db_type = {
     "cookie": "cookie",
@@ -62,6 +64,8 @@ def save_cookie(path, cookies):
 
 
 prefix = "/qk"
+
+auto_save_config = Config()
 
 
 def Quark(bot, message):
@@ -134,7 +138,14 @@ def Quark(bot, message):
         elif text[: len(prefix + "sub")] == prefix + "sub":
             notify_body = []
             try:
-                notify_body = do_save_subs(account)
+                notify_body, task_list = do_save_subs(account)
+
+                if task_list:
+                    for task in task_list:
+                        task_config = auto_save_config.get_config(task)
+                        if task_config:
+                            account.do_rename_task(task_config)
+
             except Exception as e:
                 notify_body = [f"❌❌订阅更新异常：{e}"]
 
@@ -153,6 +164,8 @@ def Quark(bot, message):
                 parse_mode="HTML",
             )
 
+            return
+
         elif text[: len(prefix + "sign")] == prefix + "sign":
             notify_body = do_sign(account)
             notify_body = "\n".join(notify_body)
@@ -161,6 +174,7 @@ def Quark(bot, message):
                 text=notify_body,
                 parse_mode="HTML",
             )
+            return
 
         elif text[: len(prefix + "set")] == prefix + "set":
             cookies = text.split(f"{prefix}set ")[1]
@@ -223,14 +237,16 @@ def Quark(bot, message):
         }
 
         if message.get("text"):
-            ____, rename = message.get("text").split(" ")
-            if rename:
-                task["taskname"] = rename
+            sub = message.get("text").split(" ")
+            if len(sub) > 1 and sub[1]:
+                task["taskname"] = sub[1]
                 task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
                 task["replace"] = "$TASKNAME \\1"
-                task["savepath"] = f"{savepath}/{rename}"
+                task["savepath"] = f"{savepath}/{sub[1]}"
 
-        db.insert(user_id, json.dumps(task), "task")
+            if len(sub) > 2:
+                _, save_key = macth_content(task["shareurl"])
+                auto_save_config.set_config(save_key, task)
 
         notify_body = do_save(account, [task])
         notify_body = "\n".join(notify_body)
@@ -240,6 +256,13 @@ def Quark(bot, message):
             text=notify_body,
             parse_mode="HTML",
         )
+
+
+def macth_content(content):
+    path = re.search(r"https:\/\/pan\.quark\.cn\/s\/([a-z0-9]+)", content)
+    if path:
+        return True, path.group(0)
+    return False, content
 
 
 def check_user_admin(bot, message, super_admin: bool, is_admin: bool):
