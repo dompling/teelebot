@@ -208,9 +208,10 @@ def Quark(bot, message):
     ):
         return
 
-    _, __, ___, uri = account.get_id_from_url(json.dumps(message, ensure_ascii=False))
+    form_url = account.get_id_from_url(json.dumps(message, ensure_ascii=False))
 
-    if uri:
+    if form_url[3]:
+        uri = form_url[3]
         if not cookies:
             status = bot.sendMessage(
                 chat_id=message["chat"]["id"],
