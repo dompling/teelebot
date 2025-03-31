@@ -840,13 +840,13 @@ def do_save_subs(account: Quarks):
     task = []
     
     for item in update_list:
-        task.append(item["share_url"])
         pwd_id = item["pwd_id"]
         stoken = item["stoken"]
         filtered_objects = list(filter(filter_condition, item["update_files"]))
         count_filtered_objects = len(filtered_objects)
         if count_filtered_objects == 0:
             continue
+        task.append(item["share_url"])
         count_update_files += count_filtered_objects
         tree.create_node(item["title"], pwd_id, "root")
         for index, file in enumerate(filtered_objects):
