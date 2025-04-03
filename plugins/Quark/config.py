@@ -24,9 +24,11 @@ class Config:
         return self._config_data.get(key)
 
     def set_config(self, key, task):
-        print(task)
         self._config_data[key] = task
-        print(self._config_data)
+        self.save_config()
+
+    def set_all_config(self, tasks):
+        self._config_data = tasks
         self.save_config()
 
     def save_config(self):

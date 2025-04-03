@@ -134,6 +134,44 @@ def Quark(bot, message):
                 reply_to_message_id=message_id,
             )
             return bot.message_deletor(60, chat_id, status["message_id"])
+        elif text[: len(prefix + "sublist")] == prefix + "sublist":
+            sub_list = auto_save_config.get_all()
+            arr = []
+            index = 1
+            for key, item in sub_list.items():
+                shareurl = item["shareurl"]
+                arr.append(
+                    f"<b>/qksubdel{index}</b> <a href='{shareurl}'>{item['taskname']}</a>"
+                )
+                index += 1
+            msg = "\n".join(arr)
+            status = bot.sendMessage(
+                chat_id=chat_id,
+                text=msg,
+                parse_mode="HTML",
+            )
+            return bot.message_deletor(10, chat_id, status["message_id"])
+        elif text[: len(prefix + "subdel")] == prefix + "subdel":
+            sub_list = auto_save_config.get_all()
+            arr = {}
+            del_index = int(text.replace(prefix + "subdel", ""))
+            index = 0
+            del_msg = ""
+            for key, item in sub_list.items():
+                index += 1
+                if del_index == index:
+                    del_msg = f"✅{index}.{item['taskname']}（删除成功）"
+                    continue
+                arr[key] = item
+            auto_save_config.set_all_config(arr)
+
+            status = bot.sendMessage(
+                chat_id=chat_id,
+                text=del_msg,
+                parse_mode="HTML",
+            )
+
+            return bot.message_deletor(10, chat_id, status["message_id"])
 
         elif text[: len(prefix + "sub")] == prefix + "sub":
             notify_body = []
