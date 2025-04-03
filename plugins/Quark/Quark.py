@@ -116,6 +116,9 @@ def Quark(bot, message):
                 "<b>/qkadmin</b> - 设置管理",
                 "<b>/qkpath</b> - 设置账号",
                 "<b>/qksign</b> - 签到",
+                "<b>/qksubadd</b> - 新增订阅链接 + 名称",
+                "<b>/qksublist</b> - 查询订阅链接",
+                "<b>/qksubdel</b> - 删除订阅链接",
                 "<b>/qksub</b> - 更新订阅链接",
             ]
             notify_body = "\n".join(notify_body)
@@ -134,6 +137,44 @@ def Quark(bot, message):
                 reply_to_message_id=message_id,
             )
             return bot.message_deletor(60, chat_id, status["message_id"])
+        elif text[: len(prefix + "subadd")] == prefix + "subadd" and message.get(
+            "reply_to_message"
+        ):
+            save_content = message.get("reply_to_message")
+            form_url = account.get_id_from_url(
+                json.dumps(save_content, ensure_ascii=False)
+            )
+            if form_url and len(form_url) > 2:
+                uri = form_url[3]
+                sub = message.get("text").split(" ")
+                task = {
+                    "taskname": "夸克机器人保存任务",
+                    "shareurl": uri,
+                    "savepath": savepath,
+                    "pattern": "",
+                    "replace": "",
+                    "enddate": "2099-01-30",
+                }
+                if sub[1]:
+                    task["taskname"] = sub[1]
+                    task["pattern"] = "^(\d+|S\d+E+)(_|\s)?(【4K】|4K)?"
+                    task["replace"] = "$TASKNAME \\1"
+                    task["savepath"] = f"{savepath}/{sub[1]}"
+                    _, save_key = macth_content(task["shareurl"])
+                    auto_save_config.set_config(save_key, task)
+                    account.do_rename_task(task)
+                    msg = f"✅新增订阅成功 （<a href='{uri}'>{sub[1]}</a>） "
+                else:
+                    msg = "❌订阅参数错误"
+            else:
+                msg = "❌不是一个有效联系"
+
+            status = bot.sendMessage(
+                chat_id=chat_id,
+                text=msg,
+                parse_mode="HTML",
+            )
+            return bot.message_deletor(10, chat_id, status["message_id"])
         elif text[: len(prefix + "sublist")] == prefix + "sublist":
             sub_list = auto_save_config.get_all()
             arr = []
@@ -279,7 +320,7 @@ def Quark(bot, message):
             sub = message.get("text").split(" ")
             if len(sub) > 1 and sub[1]:
                 task["taskname"] = sub[1]
-                task["pattern"] = "^(\d+)(_|\s)?(【4K】|4K)?"
+                task["pattern"] = "^(\d+|S\d+E+)(_|\s)?(【4K】|4K)?"
                 task["replace"] = "$TASKNAME \\1"
                 task["savepath"] = f"{savepath}/{sub[1]}"
 
