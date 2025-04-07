@@ -162,6 +162,7 @@ def Quark(bot, message):
                     task["savepath"] = f"{savepath}/{sub[1]}"
                     _, save_key = macth_content(task["shareurl"])
                     auto_save_config.set_config(save_key, task)
+                    account.do_save_task(task)
                     account.do_rename_task(task)
                     msg = f"✅新增订阅成功 （<a href='{uri}'>{sub[1]}</a>） "
                 else:
